@@ -16,10 +16,11 @@ Todos los datos deben enviarse en **JSON**. Cuando se inicia sesión o crea cuen
 >}
 
 **Respuestas erróneas**
+>{"error": descripción_del_error}
 - 400: faltan campos | correo o nombre ya en uso
 - 405: método no permitido
 
-**Respuesta exitosa**
+**Respuesta exitosa (201)**
 >{  
 >"token": jwt_generado_para_el_usuario  
 >}
@@ -39,11 +40,12 @@ Puedes poner solo el nombre y la contraseña, o el correo y la contraseña. No e
 >}
 
 **Respuestas erróneas**
+>{"error": descripción_del_error}
 - 400: faltan campos | contraseña incorrecta
 - 404: usuario no encontrado
 - 405: método no permitido
 
-**Respuesta exitosa**
+**Respuesta exitosa (201)**
 >{  
 >"token": jwt_generado_para_el_usuario  
 >}
@@ -61,5 +63,5 @@ Puedes poner solo el nombre y la contraseña, o el correo y la contraseña. No e
 - 401: token inválido o expirado
 - 405: método no permitido
 
-**Respuesta exitosa**
-* 200
+**Respuesta exitosa (200)**
+>{"mensaje": "Usuario eliminado con éxito"}
