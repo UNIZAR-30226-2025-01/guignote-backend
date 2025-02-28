@@ -1,6 +1,17 @@
 # guignote-backend
 Repositorio correspondiente al desarrollo del backend de la aplicación 'Sota, caballo y rey' para jugar al guiñote.
+---
+## Poner en funcionamiento
+>git clone \<repositorio\>  
+>cd guignote-backend/sotacaballorey/  
+>python -m venv env  
+>source env/bin/activate  
+>pip install django PyJWT  
+>python manage.py migrate  
+>python manage.py makemigrations  
+>python manage.py runserver  
 
+---
 Todos los datos deben enviarse en **JSON**. Cuando se inicia sesión o crea cuenta el frontend deberá encargarse de almacenar el token jwt generado. **Se pasará este token en la cabecera de algunas peticiones que requieren de autenticacion**.
 
 ## Crear un usuario
