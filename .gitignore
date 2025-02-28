@@ -49,7 +49,6 @@ config/settings_local.py
 # Relacionado con Docker
 docker-compose.override.yml
 docker-compose.yml
-Dockerfile
 *.dockerfile
 .dockerignore
 
