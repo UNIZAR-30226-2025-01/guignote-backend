@@ -31,7 +31,7 @@ dist/
 build/
 
 # Migraciones
-*/migrations/
+migrations/
 
 # Configuración de Django para el archivo de secret keys (como settings.py)
 # Puedes también ignorar el archivo local de configuración si no lo quieres subir a git
