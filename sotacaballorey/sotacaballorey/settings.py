@@ -1,4 +1,5 @@
 from pathlib import Path
+from os import getenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -8,18 +9,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-l31)^lavwgu^6w)n=9q%hfjh0km*a%jr9)lwxw0($7o7%v3hrl'
+SECRET_KEY = getenv('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = getenv('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'usuarios.apps.UsuariosConfig',
+    'usuarios',
+    'partidas',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -64,11 +66,11 @@ WSGI_APPLICATION = 'sotacaballorey.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'Database',
-        'USER': 'admin',
-        'PASSWORD': 'contrasenya',
-        'HOST': 'localhost',  # Use 'db' if using Docker Compose, or 'localhost' if running PostgreSQL manually
-        'PORT': '5433',
+        'NAME': getenv('POSTGRES_DB', 'Database'),
+        'USER': getenv('POSTGRES_USER', 'admin'),
+        'PASSWORD': getenv('POSTGRES_PASSWORD', 'contrasenya'),
+        'HOST': 'postgres_container',
+        'PORT': '5432',
     }
 }
 

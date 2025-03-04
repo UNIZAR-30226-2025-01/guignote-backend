@@ -46,14 +46,19 @@ config/settings_local.py
 # Archivos de configuración de editor (por ejemplo, VIM)
 *~
 
-# Relacionado con Docker
-docker-compose.override.yml
-docker-compose.yml
-*.dockerfile
-.dockerignore
-
-.docker/
-docker-entrypoint-initdb.d/
-tmp/
+# Configuración de Docker
+logs/
 *.log
+docker-compose.yml
+Dockerfile.postgres
+Dockerfile
 *.pid
+
+# Configuración de base de datos y migraciones temporales
+db.sqlite3
+*.sqlite3-journal
+migrations/**/__pycache__
+
+# Archivos de caché
+staticfiles/
+media/

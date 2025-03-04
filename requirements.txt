@@ -1,0 +1,4 @@
+Django      # Framework para backend de Python
+PyJWT       # Para la gestión de JSON Web Tokens
+gunicorn    # Servidor
+psycopg2    # Conector dde PostgreSQL con Python
