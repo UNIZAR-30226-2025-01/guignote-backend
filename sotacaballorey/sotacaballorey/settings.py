@@ -22,6 +22,8 @@ ALLOWED_HOSTS = ["*"]
 INSTALLED_APPS = [
     'usuarios',
     'partidas',
+    'usuarios.apps.UsuariosConfig',
+    'partidas.apps.PartidasConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

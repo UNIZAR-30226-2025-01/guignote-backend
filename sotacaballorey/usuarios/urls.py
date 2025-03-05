@@ -17,4 +17,11 @@ urlpatterns = [
     path('listar_solicitudes_amistad/', views_solicitudes_amistad.listar_solicitudes_amistad, name='listar_solicitudes_amistad'),
     path('eliminar_amigo/', views_solicitudes_amistad.eliminar_amigo, name='eliminar_amigo'),
     path('buscar_usuarios/', views_solicitudes_amistad.buscar_usuarios, name='buscar_usuarios'),
+
+    path('racha_actual/<int:user_id>/', views_usuarios.obtener_racha_actual, name="obtener_racha_actual"),
+    path('racha_mas_larga/<int:user_id>/', views_usuarios.obtener_racha_mas_larga, name="obtener_racha_mas_larga"),
+    path('usuarios/partidas_totales/<int:user_id>/', views_usuarios.obtener_total_partidas, name='obtener_total_partidas'),
+    path('usuarios/porcentaje_victorias/<int:user_id>/', views_usuarios.obtener_porcentaje_victorias, name='obtener_porcentaje_victorias'),
+    path('usuarios/porcentaje_derrotas/<int:user_id>/', views_usuarios.obtener_porcentaje_derrotas, name='obtener_porcentaje_derrotas'),
+    path('usuarios/estadisticas/<int:user_id>/', views_usuarios.obtener_usuario_estadisticas, name='obtener_usuario_estadisticas'),
 ]

@@ -1,8 +1,14 @@
-from utils.jwt_auth import token_required
+from django.contrib.auth.hashers import make_password, check_password
+from django.shortcuts import get_object_or_404
+from utils.jwt_auth import generar_token, token_required
 from django.views.decorators.csrf import csrf_exempt
 from usuarios.models import Usuario, SolicitudAmistad
 from django.http import JsonResponse
 import json
+import logging
+
+# Setup logging to capture errors
+logger = logging.getLogger(__name__)
 
 @csrf_exempt
 @token_required
@@ -33,6 +39,10 @@ def enviar_solicitud_amistad(request):
         destinatario = Usuario.objects.get(id=destinatario_id)
     except Usuario.DoesNotExist:
         return JsonResponse({'error':'Destinatario no encontrado'}, status=404)
+    
+    # Verificar que el usuario no se envíe solicitud a sí mismo
+    if request.usuario == destinatario:
+        return JsonResponse({'error': 'No puedes enviarte una solicitud a ti mismo'}, status=400)
 
     # Verificar que la solicitud todavía no existe
     if SolicitudAmistad.objects.filter(emisor=request.usuario, receptor=destinatario).exists():
@@ -164,3 +174,97 @@ def buscar_usuarios(request):
     usuarios_json = [{'id': u.id, 'nombre': u.nombre} for u in usuarios]
 
     return JsonResponse({'usuarios': usuarios_json}, status=200)
+
+@csrf_exempt
+def obtener_total_partidas(request, user_id):
+    """Returns the total number of games played by a user."""
+    try:
+        usuario = get_object_or_404(Usuario, id=user_id)
+        total_partidas = usuario.victorias + usuario.derrotas
+        return JsonResponse({"user": usuario.nombre, "total_partidas": total_partidas})
+    except Exception as e:
+        logger.error(f"Error retrieving total games for user {user_id}: {str(e)}")
+        return JsonResponse({"error": "An error occurred while fetching total games"}, status=500)
+
+@csrf_exempt
+def obtener_porcentaje_victorias(request, user_id):
+    """Returns the win percentage of a user."""
+    try:
+        usuario = get_object_or_404(Usuario, id=user_id)
+        total_games = usuario.victorias + usuario.derrotas
+
+        if total_games == 0:
+            return JsonResponse({"user": usuario.nombre, "porcentaje_victorias": 0.0})
+
+        win_percentage = round((usuario.victorias / total_games) * 100, 2)
+        return JsonResponse({"user": usuario.nombre, "porcentaje_victorias": win_percentage})
+
+    except Exception as e:
+        logger.error(f"Error retrieving win percentage for user {user_id}: {str(e)}")
+        return JsonResponse({"error": "An error occurred while fetching win percentage"}, status=500)
+
+@csrf_exempt
+def obtener_porcentaje_derrotas(request, user_id):
+    """Returns the loss percentage of a user."""
+    try:
+        usuario = get_object_or_404(Usuario, id=user_id)
+        total_games = usuario.victorias + usuario.derrotas
+
+        if total_games == 0:
+            return JsonResponse({"user": usuario.nombre, "porcentaje_derrotas": 0.0})
+
+        loss_percentage = round((usuario.derrotas / total_games) * 100, 2)
+        return JsonResponse({"user": usuario.nombre, "porcentaje_derrotas": loss_percentage})
+
+    except Exception as e:
+        logger.error(f"Error retrieving loss percentage for user {user_id}: {str(e)}")
+        return JsonResponse({"error": "An error occurred while fetching loss percentage"}, status=500)
+
+@csrf_exempt
+def obtener_racha_actual(request, user_id):
+    """Returns the current winning streak of a user."""
+    try:
+        usuario = get_object_or_404(Usuario, id=user_id)
+        return JsonResponse({"user": usuario.nombre, "racha_victorias": usuario.racha_victorias})
+
+    except Exception as e:
+        logger.error(f"Error retrieving current streak for user {user_id}: {str(e)}")
+        return JsonResponse({"error": "An error occurred while fetching current winning streak"}, status=500)
+
+@csrf_exempt
+def obtener_racha_mas_larga(request, user_id):
+    """Returns the longest winning streak of a user."""
+    try:
+        usuario = get_object_or_404(Usuario, id=user_id)
+        return JsonResponse({"user": usuario.nombre, "mayor_racha_victorias": usuario.mayor_racha_victorias})
+
+    except Exception as e:
+        logger.error(f"Error retrieving longest streak for user {user_id}: {str(e)}")
+        return JsonResponse({"error": "An error occurred while fetching longest winning streak"}, status=500)
+
+@csrf_exempt
+def obtener_usuario_estadisticas(request, user_id):
+    """Returns all user statistics in a single JSON response."""
+    try:
+        usuario = get_object_or_404(Usuario, id=user_id)
+
+        total_games = usuario.victorias + usuario.derrotas
+        win_percentage = round((usuario.victorias / total_games) * 100, 2) if total_games > 0 else 0.0
+        loss_percentage = round((usuario.derrotas / total_games) * 100, 2) if total_games > 0 else 0.0
+
+        estadisticas = {
+            "nombre": usuario.nombre,
+            "victorias": usuario.victorias,
+            "derrotas": usuario.derrotas,
+            "racha_victorias": usuario.racha_victorias,
+            "mayor_racha_victorias": usuario.mayor_racha_victorias,
+            "total_partidas": total_games,
+            "porcentaje_victorias": win_percentage,
+            "porcentaje_derrotas": loss_percentage
+        }
+
+        return JsonResponse(estadisticas)
+    
+    except Exception as e:
+        logger.error(f"Error retrieving statistics for user {user_id}: {str(e)}")
+        return JsonResponse({"error": "An error occurred while fetching user statistics"}, status=500)

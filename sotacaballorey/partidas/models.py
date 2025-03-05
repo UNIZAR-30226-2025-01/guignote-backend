@@ -6,6 +6,7 @@ class Partida(models.Model):
     jugador_1 = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="partidas_jugador1")
     jugador_2 = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="partidas_jugador2")
     triunfo_palo = models.CharField(max_length=10, choices=[('oros', 'Oros'), ('copas', 'Copas'), ('espadas', 'Espadas'), ('bastos', 'Bastos')])
+    ganador = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="partidas_ganadas")
     mazo_restante = models.JSONField(default=list)
     cartas_jugador_1 = models.JSONField(default=list)
     cartas_jugador_2 = models.JSONField(default=list)

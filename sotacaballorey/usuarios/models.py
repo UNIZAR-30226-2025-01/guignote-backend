@@ -9,6 +9,11 @@ class Usuario(models.Model):
         (max_length=128, blank=False, null=False, unique=False)
     amigos = models.ManyToManyField\
         ('self', symmetrical=True, blank=True)
+    victorias = models.IntegerField(default=0)
+    derrotas = models.IntegerField(default=0)
+    racha_victorias = models.IntegerField(default=0)
+    mayor_racha_victorias = models.IntegerField(default=0)
+    last_login = None
     
     def __str__(self):
         return 'Usuario:\n' + \
