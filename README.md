@@ -140,6 +140,32 @@ Puedes poner solo el nombre y la contraseña, o el correo y la contraseña. No e
 >"mensaje": "Solicitud aceptada con éxito"  
 >}
 
+## Denegar solicitud de amistad
+
+**Endpoint**
+> POST http://188.165.76.134:8000/usuarios/denegar_solicitud_amistad/
+
+**Encabezado (Obligatorio)**
+> Auth: <tu_token_jwt>
+
+**Parámetros en el cuerpo (JSON)**
+>{  
+> "solicitud_id": "id_de_la_solicitud"  
+>}
+
+**Respuestas erróneas**
+>{"error": "descripción_del_error"}
+- 400: faltan campos
+- 401: token inválido o expirado
+- 403: no puedes denegar una solicitud que no te pertenece
+- 404: solicitud no encontrada
+- 405: método no permitido
+
+**Respuesta exitosa (201)**
+>{  
+>"mensaje": "Solicitud denegada con éxito"  
+>}
+
 ## Listar solicitudes de amistad pendientes
 
 **Endpoint**
@@ -192,7 +218,11 @@ Puedes poner solo el nombre y la contraseña, o el correo y la contraseña. No e
 > Auth: <tu_token_jwt>
 
 **Parámetros de la URL**
-> ?nombre=nombre_a_buscar&incluir_amigos=true|false
+> ?nombre=nombre_a_buscar&incluir_amigos=true|false&incluir_me=true|false&incluir_pendientes=true|false
+- nombre: prefijo/cadena. La petición devuelve todos los usuarios cuyo nombre contiene esa cadena.
+- incluir_amigos false: excluye a tus amigos de los resultados.
+- incluir_me: te excluye de los resultados.
+- incluir_pendientes: excluye a los usuarios a los que has envíado ya peticiones.
 
 **Respuestas erróneas**
 >{"error": "descripción_del_error"}

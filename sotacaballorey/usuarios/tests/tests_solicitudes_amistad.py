@@ -67,7 +67,7 @@ class SolicitudAmistadTests(TestCase):
             correo="amigo@gmail.com",
             contrasegna=make_password("654321")
         )
-        solicitud = SolicitudAmistad.objects.create(emisor=amigo, receptor= self.usuario)
+        solicitud = SolicitudAmistad.objects.create(emisor=amigo, receptor=self.usuario)
 
         # Acepto la solicitud de amistad de amigo
         respuesta = self.client.post('/usuarios/aceptar_solicitud_amistad/', json.dumps({
@@ -75,6 +75,7 @@ class SolicitudAmistadTests(TestCase):
         }), content_type="application/json", HTTP_AUTH=self.token)
         self.assertEqual(respuesta.status_code, 200)
         self.assertFalse(SolicitudAmistad.objects.filter(id=solicitud.id).exists())
+        self.assertTrue(self.usuario.amigos.filter(id=amigo.id).exists())
 
         # Error por falta de campos
         respuesta = self.client.post('/usuarios/aceptar_solicitud_amistad/', json.dumps({}), content_type="application/json", HTTP_AUTH=self.token)
@@ -89,6 +90,43 @@ class SolicitudAmistadTests(TestCase):
         # Error no puedes aceptar una solicitud para la que no eres destinatario
         solicitud = SolicitudAmistad.objects.create(emisor=self.usuario, receptor=amigo)
         respuesta = self.client.post('/usuarios/aceptar_solicitud_amistad/', json.dumps({
+            'solicitud_id': solicitud.id
+        }), content_type="application/json", HTTP_AUTH=self.token)
+        self.assertEqual(respuesta.status_code, 403)
+
+    def test_denegar_solicitud_amistad(self):
+        """
+        Prueba denegar solicitud amistad
+        """
+        # Creo un usuario y solicitud de amistad
+        amigo = Usuario.objects.create(
+            nombre="amigo",
+            correo="amigo@gmail.com",
+            contrasegna=make_password("654321")
+        )
+        solicitud = SolicitudAmistad.objects.create(emisor=amigo, receptor=self.usuario)
+
+        # Rechazo la solicitud de amistad del usuario
+        respuesta = self.client.post('/usuarios/denegar_solicitud_amistad/', json.dumps({
+            'solicitud_id': solicitud.id
+        }), content_type="application/json", HTTP_AUTH=self.token)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFalse(SolicitudAmistad.objects.filter(id=solicitud.id).exists())
+        self.assertFalse(self.usuario.amigos.filter(id=amigo.id).exists())
+
+        # Error por falta de campos
+        respuesta = self.client.post('/usuarios/denegar_solicitud_amistad/', json.dumps({}), content_type="application/json", HTTP_AUTH=self.token)
+        self.assertEqual(respuesta.status_code, 400)
+
+        # Error no existe la solicitud de amistad
+        respuesta = self.client.post('/usuarios/denegar_solicitud_amistad/', json.dumps({
+            'solicitud_id': -1
+        }), content_type="application/json", HTTP_AUTH=self.token)
+        self.assertEqual(respuesta.status_code, 404)
+
+        # Error no puedes denegar una solicitud para la que no eres destinatario
+        solicitud = SolicitudAmistad.objects.create(emisor=self.usuario, receptor=amigo)
+        respuesta = self.client.post('/usuarios/denegar_solicitud_amistad/', json.dumps({
             'solicitud_id': solicitud.id
         }), content_type="application/json", HTTP_AUTH=self.token)
         self.assertEqual(respuesta.status_code, 403)

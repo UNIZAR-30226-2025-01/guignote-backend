@@ -14,6 +14,7 @@ urlpatterns = [
     # Relacionadas con lista de amigos de usuarios
     path('enviar_solicitud_amistad/', views_solicitudes_amistad.enviar_solicitud_amistad, name="enviar_solicitud_amistad"),
     path('aceptar_solicitud_amistad/', views_solicitudes_amistad.aceptar_solicitud_amistad, name='aceptar_solicitud_amistad'),
+    path('denegar_solicitud_amistad/', views_solicitudes_amistad.denegar_solicitud_amistad, name='denegar_solicitud_amistad'),
     path('listar_solicitudes_amistad/', views_solicitudes_amistad.listar_solicitudes_amistad, name='listar_solicitudes_amistad'),
     path('eliminar_amigo/', views_solicitudes_amistad.eliminar_amigo, name='eliminar_amigo'),
     path('buscar_usuarios/', views_solicitudes_amistad.buscar_usuarios, name='buscar_usuarios'),

@@ -4,6 +4,7 @@ from utils.jwt_auth import generar_token, token_required
 from django.views.decorators.csrf import csrf_exempt
 from usuarios.models import Usuario, SolicitudAmistad
 from django.http import JsonResponse
+from django.db.models import Q
 import json
 import logging
 
@@ -94,6 +95,44 @@ def aceptar_solicitud_amistad(request):
 
 @csrf_exempt
 @token_required
+def denegar_solicitud_amistad(request):
+    """
+    Quita una solicitud de amistad
+    ├─ Método HTTP: POST
+    ├─ Cabecera petición con Auth:<token>
+    ├─ Cuerpo JSON con 'solicitud_id'
+    └─ Si todo correcto, elimina solicitud
+    """
+
+    # Error por método no permitido
+    if request.method != 'POST':
+        return JsonResponse({'error':'Método no permitido'}, status=405)
+
+    # Obtengo datos del cuerpo de la petición
+    data = json.loads(request.body)
+    solicitud_id = data.get('solicitud_id')
+
+    # Error por campo vacío
+    if not solicitud_id:
+        return JsonResponse({'error': 'Faltan campos'}, status=400)
+
+    # Verificar que solicitud existe
+    solicitud: SolicitudAmistad = None
+    try:
+        solicitud = SolicitudAmistad.objects.get(id=solicitud_id)
+    except SolicitudAmistad.DoesNotExist:
+        return JsonResponse({'error':'Solicitud no encontrada'}, status=404)
+
+    if solicitud.receptor != request.usuario:
+        return JsonResponse({'error':'No puedes denegar una solicitud que no te pertenece'}, status=403)
+
+    # Quitar la solicitud de bbdd
+    solicitud.delete()
+
+    return JsonResponse({'mensaje':'Solicitud denegada con éxito'}, status=200)
+
+@csrf_exempt
+@token_required
 def listar_solicitudes_amistad(request):
     """
     Lista solicitudes de amistad pendientes del usuario autenticado
@@ -153,7 +192,7 @@ def buscar_usuarios(request):
     Busca usuarios por nombre
     ├─ Método HTTP: GET
     ├─ Cabecera petición con Auth:<token>
-    ├─ Cuerpo JSON con 'nombre' y 'incluir_amigos'
+    ├─ Cuerpo JSON con 'nombre', 'incluir_amigos', 'incluir_me', 'incluir_pendientes'
     └─ Devuelve lista de usuarios con su id y nombre
     """
 
@@ -162,15 +201,33 @@ def buscar_usuarios(request):
         return JsonResponse({'error':'Método no permitido'}, status=405)
 
     # Obtenemos parámetros
-    nombre = request.GET.get('nombre', '')
+    nombre = request.GET.get('nombre', '').strip()
     incluir_amigos = request.GET.get('incluir_amigos', 'false').lower() == 'true'
+    incluir_me = request.GET.get('incluir_me', 'false').lower() == 'true'
+    incluir_pendientes = request.GET.get('incluir_pendientes', 'false').lower() == 'true'
 
-    # Obtenemos usuarios cuyo nombre contenga 'nombre'. Si incluir_amigos es falso
-    # no incluiremos en el resultado a los amigos, aunque cumplan la restricción
-    usuarios = Usuario.objects.filter(nombre__icontains=nombre)
+    # Filtro usuarios cuyo nombre contenga 'nombre'
+    filtros = Q(nombre__icontains=nombre)
+
+    # Excluimos amigos si incluir_amigos es falso
     if not incluir_amigos:
-        usuarios = usuarios.exclude(id__in=request.usuario.amigos.all())
+        amigos_ids = request.usuario.amigos.values_list('id', flat=True)
+        filtros &= ~Q(id__in=amigos_ids)
 
+    # Excluirme a mi mismo si incluir_me es falso
+    if not incluir_me:
+        filtros &= ~Q(id=request.usuario.id)
+
+    # Excluir usuarios con solicitudes pendientes mías de aceptar
+    if not incluir_pendientes:
+        solicitudes_pendientes = SolicitudAmistad.objects.filter(
+            emisor=request.usuario).values_list('receptor_id', flat=True)
+        filtros &= ~Q(id__in=solicitudes_pendientes)
+
+    # Aplicar filtro
+    usuarios = Usuario.objects.filter(filtros)
+    
+    # Convertir a JSON
     usuarios_json = [{'id': u.id, 'nombre': u.nombre} for u in usuarios]
 
     return JsonResponse({'usuarios': usuarios_json}, status=200)
