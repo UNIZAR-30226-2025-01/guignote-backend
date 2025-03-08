@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import crear_partida, obtener_estado_partida, cambiar_estado_partida
+from .views import *
 
 urlpatterns = [
     path('crear/', crear_partida, name='crear_partida'),

@@ -7,6 +7,7 @@ from usuarios.views import obtener_racha_actual, obtener_racha_mas_larga, inicia
 import json
 from django.http import JsonResponse
 
+
 class PartidaTestCase(TestCase):
 
     def setUp(self):
@@ -25,56 +26,51 @@ class PartidaTestCase(TestCase):
 
     def test_crear_partida(self):
         """Test creating a match using the crear_partida method."""
-        # Call the method directly with objects
+
         request_data = {"jugador1_id": self.jugador1.id, "jugador2_id": self.jugador2.id}
         create_response = self.client.post(
-            reverse('crear_partida'), 
-            data=json.dumps(request_data), 
+            reverse('crear_partida'),
+            data=json.dumps(request_data),
             content_type="application/json"
         )
-        partida = Partida.objects.create(jugador_1=self.jugador1, jugador_2=self.jugador2)
+
         self.assertEqual(create_response.status_code, 201)  # Ensure match was created
 
         # Extract partida_id from response
         partida_id = create_response.json().get("partida_id")
         self.assertIsNotNone(partida_id)  # Ensure partida_id is returned
 
-
-
         # Verify match exists in database
-        partida_db = Partida.objects.get(id=partida.id)
+        partida_db = Partida.objects.get(id=partida_id)
         self.assertEqual(partida_db.estado_partida, "EN_JUEGO")
-        self.assertEqual(partida_db, partida)
-
 
     def test_barajar_cartas(self):
         """Test if cards are shuffled and distributed correctly using obtener_estado_partida."""
-        
-        # 🔹 Create match using API
+
         request_data = {"jugador1_id": self.jugador1.id, "jugador2_id": self.jugador2.id}
         create_response = self.client.post(
-            reverse('crear_partida'), 
+            reverse('crear_partida'),
             data=json.dumps(request_data),
             content_type="application/json"
         )
+
         self.assertEqual(create_response.status_code, 201)  # Ensure match creation was successful
 
-        # Extract partida_id from response
         partida_id = create_response.json().get("partida_id")
         self.assertIsNotNone(partida_id)  # Ensure partida_id exists
 
-        # 🔹 Retrieve match state using obtener_estado_partida
+        # Retrieve match state using obtener_estado_partida
         estado_response = self.client.get(reverse('obtener_estado_partida', args=[partida_id]))
         self.assertEqual(estado_response.status_code, 200)  # Ensure request was successful
+
         estado_data = estado_response.json()
 
-        # 🔹 Ensure match has 5 cards for each player
+        # Ensure match has 5 cards for each player
         self.assertEqual(len(estado_data["cartas_jugador_1"]), 5)
         self.assertEqual(len(estado_data["cartas_jugador_2"]), 5)
 
-        # 🔹 Ensure triumph suit is correctly assigned
+        # Ensure triumph suit is correctly assigned
         self.assertIn(estado_data["triunfo_palo"], ["oros", "copas", "espadas", "bastos"])
-
 
     def test_cambiar_estado_partida(self):
         """Test changing the match state using JSON POST requests."""
@@ -84,7 +80,11 @@ class PartidaTestCase(TestCase):
 
         # Simulate JSON request to change match state
         request_data = json.dumps({"estado": "FINALIZADO", "ganador_id": self.jugador1.id})
-        response = self.client.post(reverse('cambiar_estado_partida', args=[partida.id]), request_data, content_type="application/json")
+        response = self.client.post(
+            reverse('cambiar_estado_partida', args=[partida.id]),
+            request_data,
+            content_type="application/json"
+        )
 
         self.assertEqual(response.status_code, 200)
 
@@ -93,17 +93,20 @@ class PartidaTestCase(TestCase):
         self.assertEqual(partida.estado_partida, "FINALIZADO")
         self.assertEqual(partida.ganador, self.jugador1)
 
-
     def test_rachas(self):
         """Test match state changes, win streak resets, and longest streak updates correctly."""
 
         # 🔹 Player 1 wins 4 consecutive matches using JSON POST requests
         for _ in range(4):
             partida = Partida.objects.create(jugador_1=self.jugador1, jugador_2=self.jugador2, estado_partida="EN_JUEGO")
-            
+
             # Simulate JSON request
             request_data = json.dumps({"estado": "FINALIZADO", "ganador_id": self.jugador1.id})
-            request = self.client.post(reverse('cambiar_estado_partida', args=[partida.id]), request_data, content_type="application/json")
+            request = self.client.post(
+                reverse('cambiar_estado_partida', args=[partida.id]),
+                request_data,
+                content_type="application/json"
+            )
 
             self.assertEqual(request.status_code, 200)
 
@@ -112,9 +115,6 @@ class PartidaTestCase(TestCase):
             self.jugador2.refresh_from_db()
 
             # Ensure streak is increasing
-
-
-            self.assertIn("racha_actual", reverse('obtener_racha_actual', args=[self.jugador1.id]))  # This line will trigger KeyError if missing
             racha_actual = self.client.get(reverse('obtener_racha_actual', args=[self.jugador1.id])).json()["racha_victorias"]
             mayor_racha = self.client.get(reverse('obtener_racha_mas_larga', args=[self.jugador1.id])).json()["mayor_racha_victorias"]
 
@@ -123,11 +123,8 @@ class PartidaTestCase(TestCase):
 
         # 🔹 Player 1 loses a match
         partida = Partida.objects.create(jugador_1=self.jugador1, jugador_2=self.jugador2, estado_partida="EN_JUEGO")
-
-        # Simulate JSON request for loss
         request_data = json.dumps({"estado": "FINALIZADO", "ganador_id": self.jugador2.id})
         request = self.client.post(reverse('cambiar_estado_partida', args=[partida.id]), request_data, content_type="application/json")
-
         self.assertEqual(request.status_code, 200)
 
         # Refresh stats
@@ -135,25 +132,25 @@ class PartidaTestCase(TestCase):
         self.jugador2.refresh_from_db()
 
         # Ensure streak resets but longest streak remains
-  
         racha_actual = self.client.get(reverse('obtener_racha_actual', args=[self.jugador1.id])).json()["racha_victorias"]
         mayor_racha = self.client.get(reverse('obtener_racha_mas_larga', args=[self.jugador1.id])).json()["mayor_racha_victorias"]
-
         self.assertEqual(racha_actual, 0)
         self.assertEqual(mayor_racha, 4)  # Longest streak should stay at 4
 
         # 🔹 Player 1 wins 6 matches in a row (breaking previous longest streak of 4)
         for _ in range(6):
-            partida = Partida.objects.create(jugador_1=self.jugador1, jugador_2=self.jugador2, estado_partida="EN_JUEGO")
 
+
+            partida = Partida.objects.create(jugador_1=self.jugador1, jugador_2=self.jugador2, estado_partida="EN_JUEGO")
             # Simulate JSON request
             request_data = json.dumps({"estado": "FINALIZADO", "ganador_id": self.jugador1.id})
             request = self.client.post(reverse('cambiar_estado_partida', args=[partida.id]), request_data, content_type="application/json")
-
             self.assertEqual(request.status_code, 200)
+
 
             # Refresh stats
             self.jugador1.refresh_from_db()
+
 
             # Ensure streak increases correctly
             racha_actual = self.client.get(reverse('obtener_racha_actual', args=[self.jugador1.id])).json()["racha_victorias"]
@@ -175,10 +172,15 @@ class PartidaTestCase(TestCase):
         expected_win_percentage = (10 / 11) * 100  # 10 wins out of 11 matches
         self.assertAlmostEqual(win_percentage, expected_win_percentage, places=1)
 
+
         # 🔹 Test loss percentage
         loss_percentage = self.client.get(reverse('obtener_porcentaje_derrotas', args=[self.jugador1.id])).json()["porcentaje_derrotas"]
         expected_loss_percentage = (1 / 11) * 100  # 1 loss out of 11 matches
         self.assertAlmostEqual(loss_percentage, expected_loss_percentage, places=1)
+
+
+
+
 
         # 🔹 Test overall statistics
         overall_stats = self.client.get(reverse('obtener_usuario_estadisticas', args=[self.jugador1.id])).json()
