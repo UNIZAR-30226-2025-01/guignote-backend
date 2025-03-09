@@ -1,6 +1,4 @@
-from django.contrib.auth.hashers import make_password, check_password
-from django.shortcuts import get_object_or_404
-from utils.jwt_auth import generar_token, token_required
+from utils.jwt_auth import token_required
 from django.views.decorators.csrf import csrf_exempt
 from usuarios.models import Usuario, SolicitudAmistad
 from django.http import JsonResponse
