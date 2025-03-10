@@ -20,7 +20,7 @@ ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
-    'usuarios', 'partidas', 'chat_partida',
+    'usuarios', 'partidas', 'chat_partida', 'chat_global',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

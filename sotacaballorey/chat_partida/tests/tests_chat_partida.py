@@ -45,7 +45,7 @@ class ChatPartidaTestCase(TestCase):
 
         for mensaje, headers in mensajes_partida1:
             response = self.client.post(
-                reverse('enviar_mensaje_chat', args=[self.partida1.id, mensaje]),
+                reverse('chat_partida:enviar_mensaje_chat', args=[self.partida1.id, mensaje]),
                 HTTP_AUTH= headers
             )
             self.assertEqual(response.status_code, 201)  # Ensure messages are sent successfully
@@ -59,13 +59,13 @@ class ChatPartidaTestCase(TestCase):
 
         for mensaje, headers in mensajes_partida2:
             response = self.client.post(
-                reverse('enviar_mensaje_chat', args=[self.partida2.id, mensaje]),
+                reverse('chat_partida:enviar_mensaje_chat', args=[self.partida2.id, mensaje]),
                 HTTP_AUTH=headers
             )
             self.assertEqual(response.status_code, 201)
 
         # 🔹 Retrieve messages for Match 1
-        response_partida1 = self.client.get(reverse('obtener_mensajes_chat', args=[self.partida1.id]), HTTP_AUTH=self.token_jugador1)
+        response_partida1 = self.client.get(reverse('chat_partida:obtener_mensajes_chat', args=[self.partida1.id]), HTTP_AUTH=self.token_jugador1)
         self.assertEqual(response_partida1.status_code, 200)
 
         mensajes_recibidos_1 = response_partida1.json()["mensajes"]
@@ -76,7 +76,7 @@ class ChatPartidaTestCase(TestCase):
             self.assertLessEqual(mensajes_recibidos_1[i]["timestamp"], mensajes_recibidos_1[i + 1]["timestamp"])
 
         # 🔹 Retrieve messages for Match 2
-        response_partida2 = self.client.get(reverse('obtener_mensajes_chat', args=[self.partida2.id]), HTTP_AUTH=self.token_jugador3)
+        response_partida2 = self.client.get(reverse('chat_partida:obtener_mensajes_chat', args=[self.partida2.id]), HTTP_AUTH=self.token_jugador3)
         self.assertEqual(response_partida2.status_code, 200)
 
         mensajes_recibidos_2 = response_partida2.json()["mensajes"]
@@ -95,7 +95,7 @@ class ChatPartidaTestCase(TestCase):
         mensaje_falso = "Intentando engañar el sistema!"
 
         response = self.client.post(
-            reverse('enviar_mensaje_chat', args=[self.partida1.id, mensaje_falso]),
+            reverse('chat_partida:enviar_mensaje_chat', args=[self.partida1.id, mensaje_falso]),
             HTTP_AUTH=self.auth_headers_jugador1  # Using jugador1's token but sending as jugador2
         )
 
