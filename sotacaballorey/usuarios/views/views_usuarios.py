@@ -204,28 +204,69 @@ def obtener_racha_mas_larga(request, user_id):
         return JsonResponse({"error": "An error occurred while fetching longest winning streak"}, status=500)
 
 @csrf_exempt
-def obtener_usuario_estadisticas(request, user_id):
-    """Returns all user statistics in a single JSON response."""
-    try:
-        usuario = get_object_or_404(Usuario, id=user_id)
+@token_required
+def informacion(request):
+    """
+    Devuelve la información del usuario: nombre, correo y estadísticas
+    ├─ Método HTTP: GET
+    └─ Cabecera petición con Auth:<token>
+    """
 
-        total_games = usuario.victorias + usuario.derrotas
-        win_percentage = round((usuario.victorias / total_games) * 100, 2) if total_games > 0 else 0.0
-        loss_percentage = round((usuario.derrotas / total_games) * 100, 2) if total_games > 0 else 0.0
+    # Error por método no permitido
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
 
-        estadisticas = {
-            "nombre": usuario.nombre,
-            "victorias": usuario.victorias,
-            "derrotas": usuario.derrotas,
-            "racha_victorias": usuario.racha_victorias,
-            "mayor_racha_victorias": usuario.mayor_racha_victorias,
-            "total_partidas": total_games,
-            "porcentaje_victorias": win_percentage,
-            "porcentaje_derrotas": loss_percentage
-        }
+    # Devuelvo estadísticas, nombre y correo en formato JSON
+    usuario = request.usuario
+    estadisticas = {
+        'nombre': usuario.nombre,
+        'correo': usuario.correo,
+        'victorias': usuario.victorias,
+        'derrotas': usuario.derrotas,
+        'racha': usuario.racha_victorias,
+        'mejor_racha': usuario.mayor_racha_victorias,
+        'elo': usuario.elo,
+        'mejor_elo': usuario.mayor_elo
+    }
 
-        return JsonResponse(estadisticas)
+    return JsonResponse(estadisticas, status=200)
+
+@csrf_exempt
+@token_required
+def informacion_by_id(request):
+    """
+    Devuelve la información de un usuario con un id dado: nombre, correo y estadísticas
+    ├─ Método HTTP: GET
+    └─ Parámetros URL 'id'
+    """
+
+    # Error por método no permitido
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    # Obtengo parámetros
+    usuario_id = request.GET.get('id')
+
+    # Error por campo vacío
+    if not usuario_id:
+        return JsonResponse({'error': 'Faltan campos'}, status=400)
     
-    except Exception as e:
-        logger.error(f"Error retrieving statistics for user {user_id}: {str(e)}")
-        return JsonResponse({"error": "An error occurred while fetching user statistics"}, status=500)
+    usuario: Usuario = None
+    try:
+        amigo = Usuario.objects.get(id=usuario_id)
+    except Usuario.DoesNotExist:
+        return JsonResponse({'error': 'Amigo no encontrado'}, status=404)
+
+    # Devuelvo estadísticas, nombre y correo en formato JSON
+    estadisticas = {
+        'nombre': usuario.nombre,
+        'correo': usuario.correo,
+        'victorias': usuario.victorias,
+        'derrotas': usuario.derrotas,
+        'racha': usuario.racha_victorias,
+        'mejor_racha': usuario.mayor_racha_victorias,
+        'elo': usuario.elo,
+        'mejor_elo': usuario.mayor_elo
+    }
+
+    return JsonResponse(estadisticas, status=200)
