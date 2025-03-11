@@ -2,8 +2,6 @@ from django.test import TestCase
 from django.urls import reverse
 from partidas.models import Partida  # Import Partida from partidas app
 from usuarios.models import Usuario  # Import Usuario from usuarios app
-from partidas.views import cambiar_estado_partida, barajar_cartas, crear_partida  # Import methods directly
-from usuarios.views import obtener_racha_actual, obtener_racha_mas_larga, iniciar_sesion  # Import user stats methods
 import json
 from django.http import JsonResponse
 

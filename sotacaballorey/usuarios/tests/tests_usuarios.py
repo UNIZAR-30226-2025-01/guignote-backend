@@ -1,4 +1,6 @@
 from django.test import TestCase, Client
+from usuarios.models import Usuario
+from django.urls import reverse
 import json
 
 class UsuarioTests(TestCase):
@@ -6,6 +8,8 @@ class UsuarioTests(TestCase):
     def setUp(self):
         super().setUp()
         self.cliente = Client()
+        self.usuario1 = Usuario.objects.create(nombre="Carlos", correo="carlos@example.com", contrasegna="1234")
+        self.usuario2 = Usuario.objects.create(nombre="Elena", correo="elena@example.com", contrasegna="1234")
 
     def test_crear_usuario(self):
         """
@@ -120,3 +124,14 @@ class UsuarioTests(TestCase):
         # Error por token no proporcionado
         respuesta = self.cliente.delete('/usuarios/eliminar_usuario/')
         self.assertEqual(respuesta.status_code, 401)
+        
+    def test_obtener_id_por_nombre_existente(self):
+            """Test retrieving user ID for an existing username."""
+            response = self.client.get(reverse('obtener_id_por_nombre', args=[self.usuario1.nombre]))
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["user_id"], self.usuario1.id)
+
+    def test_obtener_id_por_nombre_no_existente(self):
+        """Test retrieving user ID for a username that does not exist."""
+        response = self.client.get(reverse('obtener_id_por_nombre', args=["UsuarioInexistente"]))
+        self.assertEqual(response.status_code, 404)  # Should return "Not Found"
