@@ -19,10 +19,6 @@ class Usuario(models.Model):
         (null=False, default=0, validators=[MinValueValidator(0)])
     mayor_racha_victorias = models.IntegerField\
         (null=False, default=0, validators=[MinValueValidator(0)])
-    elo = models.IntegerField\
-        (null=False, default=0, validators=[MinValueValidator(0)])
-    mayor_elo = models.IntegerField\
-        (null=False, default=0, validators=[MinValueValidator(0)])
     
     def __str__(self):
         return 'Usuario:\n' + \

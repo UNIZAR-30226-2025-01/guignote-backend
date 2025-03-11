@@ -183,11 +183,11 @@ class PartidaTestCase(TestCase):
 
 
         # 🔹 Test overall statistics
-        """overall_stats = self.client.get(reverse('obtener_usuario_estadisticas', args=[self.jugador1.id])).json()
+        overall_stats = self.client.get(reverse('obtener_usuario_estadisticas', args=[self.jugador1.id])).json()
         self.assertEqual(overall_stats["victorias"], 10)
         self.assertEqual(overall_stats["derrotas"], 1)
         self.assertEqual(overall_stats["racha_victorias"], 6)
         self.assertEqual(overall_stats["mayor_racha_victorias"], 6)
         self.assertEqual(overall_stats["total_partidas"], 11)
         self.assertAlmostEqual(overall_stats["porcentaje_victorias"], expected_win_percentage, places=1)
-        self.assertAlmostEqual(overall_stats["porcentaje_derrotas"], expected_loss_percentage, places=1)"""
+        self.assertAlmostEqual(overall_stats["porcentaje_derrotas"], expected_loss_percentage, places=1)

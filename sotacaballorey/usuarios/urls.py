@@ -10,10 +10,6 @@ urlpatterns = [
     path('iniciar_sesion/', views_usuarios.iniciar_sesion, name='iniciar_sesion'),
     path('eliminar_usuario/', views_usuarios.eliminar_usuario, name='eliminar_usuario'),
     path('obtener_amigos/', views_usuarios.obtener_amigos, name='obtener_amigos'),
-    
-    # Información usuarios
-    path('me/', views_usuarios.informacion, name='me'),
-    path('informacion/', views_usuarios.informacion_by_id, name='informacion'),
 
     # Relacionadas con lista de amigos de usuarios
     path('enviar_solicitud_amistad/', views_solicitudes_amistad.enviar_solicitud_amistad, name="enviar_solicitud_amistad"),
@@ -28,4 +24,5 @@ urlpatterns = [
     path('usuarios/partidas_totales/<int:user_id>/', views_usuarios.obtener_total_partidas, name='obtener_total_partidas'),
     path('usuarios/porcentaje_victorias/<int:user_id>/', views_usuarios.obtener_porcentaje_victorias, name='obtener_porcentaje_victorias'),
     path('usuarios/porcentaje_derrotas/<int:user_id>/', views_usuarios.obtener_porcentaje_derrotas, name='obtener_porcentaje_derrotas'),
+    path('usuarios/estadisticas/<int:user_id>/', views_usuarios.obtener_usuario_estadisticas, name='obtener_usuario_estadisticas'),
 ]
