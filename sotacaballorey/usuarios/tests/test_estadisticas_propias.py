@@ -89,7 +89,8 @@ class EstadisticasUsuarioTestCase(TestCase):
             "mayor_racha_victorias": self.usuario1.mayor_racha_victorias,
             "total_partidas": self.usuario1.victorias + self.usuario1.derrotas,
             "porcentaje_victorias": round((self.usuario1.victorias / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2),
-            "porcentaje_derrotas": round((self.usuario1.derrotas / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2)
+            "porcentaje_derrotas": round((self.usuario1.derrotas / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2),
+            "elo": 1200
         }
 
         self.assertEqual(response.json(), expected_data)

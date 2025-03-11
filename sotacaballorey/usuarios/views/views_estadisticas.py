@@ -96,7 +96,8 @@ def obtener_usuario_estadisticas(request, user_id):
             "mayor_racha_victorias": usuario.mayor_racha_victorias,
             "total_partidas": total_games,
             "porcentaje_victorias": win_percentage,
-            "porcentaje_derrotas": loss_percentage
+            "porcentaje_derrotas": loss_percentage,
+            "elo": usuario.elo
         }
 
         return JsonResponse(estadisticas)
@@ -177,6 +178,31 @@ def obtener_racha_mas_larga_autenticado(request):
     except Exception as e:
         logger.error(f"Error retrieving longest streak for user {usuario.id}: {str(e)}")
         return JsonResponse({"error": "An error occurred while fetching longest winning streak"}, status=500)
+    
+@csrf_exempt
+@token_required
+def obtener_elo(request, user_id):
+    """
+    Devuelve el Elo actual de un usuario.
+    """
+    if request.method == "GET":
+        usuario = get_object_or_404(Usuario, id=user_id)
+        return JsonResponse({"user": usuario.nombre, "elo": usuario.elo}, status=200)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
+@csrf_exempt
+@token_required
+def obtener_elo_autenticado(request):
+    """
+    Devuelve el Elo actual del usuario autenticado.
+    El usuario autenticado se obtiene del token.
+    """
+    if request.method == "GET":
+        usuario = request.usuario  # Usuario autenticado extraído del token
+        return JsonResponse({"user": usuario.nombre, "elo": usuario.elo}, status=200)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
 
 
 @csrf_exempt
@@ -198,7 +224,8 @@ def obtener_usuario_estadisticas_autenticado(request):
             "mayor_racha_victorias": usuario.mayor_racha_victorias,
             "total_partidas": total_games,
             "porcentaje_victorias": win_percentage,
-            "porcentaje_derrotas": loss_percentage
+            "porcentaje_derrotas": loss_percentage,
+            "elo": usuario.elo
         }
 
         return JsonResponse(estadisticas)
@@ -207,4 +234,3 @@ def obtener_usuario_estadisticas_autenticado(request):
         logger.error(f"Error retrieving statistics for user {usuario.id}: {str(e)}")
         return JsonResponse({"error": "An error occurred while fetching user statistics"}, status=500)
     
-

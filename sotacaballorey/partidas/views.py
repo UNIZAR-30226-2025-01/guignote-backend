@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from partidas.models import Partida  # Import Partida (Match Object) from partidas app
 from usuarios.models import Usuario  # Import Usuario (User Object) from usuarios app
+from .elo import calcular_nuevo_elo  # Import Elo calculation function
 
 
 # Setup logger
@@ -142,6 +143,15 @@ def cambiar_estado_partida(request, partida_id):
 
         perdedor.derrotas += 1
         perdedor.racha_victorias = 0  # Reset loser’s streak
+        
+        # Calcular nuevo Elo
+        nuevo_elo_ganador, nuevo_elo_perdedor = calcular_nuevo_elo(
+            ganador.elo, perdedor.elo, resultado_a=1
+        )
+
+        # Guardar nuevas puntuaciones
+        ganador.elo = nuevo_elo_ganador
+        perdedor.elo = nuevo_elo_perdedor
 
         # Save changes
         ganador.save()
