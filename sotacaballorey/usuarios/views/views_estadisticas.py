@@ -234,3 +234,21 @@ def obtener_usuario_estadisticas_autenticado(request):
         logger.error(f"Error retrieving statistics for user {usuario.id}: {str(e)}")
         return JsonResponse({"error": "An error occurred while fetching user statistics"}, status=500)
     
+    
+@csrf_exempt
+def obtener_top_elo(request):
+    """
+    Returns the top 20 players with the highest Elo rating.
+    """
+    if request.method == "GET":
+        top_players = Usuario.objects.order_by('-elo')[:20]
+
+        # Format response
+        ranking = [
+            {"nombre": player.nombre, "elo": player.elo}
+            for player in top_players
+        ]
+
+        return JsonResponse({"top_elo_players": ranking}, status=200)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)

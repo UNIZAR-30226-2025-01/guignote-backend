@@ -5,13 +5,18 @@ urlpatterns = [
     # Hola, mundo (Prueba)
     path('', views_usuarios.index, name='index'),
 
+
+    #######################################################################################################################################
     # Relacionadas con usuarios
     path('crear_usuario/', views_usuarios.crear_usuario, name='crear_usuario'),
     path('iniciar_sesion/', views_usuarios.iniciar_sesion, name='iniciar_sesion'),
     path('eliminar_usuario/', views_usuarios.eliminar_usuario, name='eliminar_usuario'),
     path('obtener_amigos/', views_usuarios.obtener_amigos, name='obtener_amigos'),
     path('usuarios/id/<str:username>/', views_usuarios.obtener_id_por_nombre, name="obtener_id_por_nombre"),
+    #######################################################################################################################################
+    
 
+    #######################################################################################################################################
     # Relacionadas con lista de amigos de usuarios
     path('enviar_solicitud_amistad/', views_solicitudes_amistad.enviar_solicitud_amistad, name="enviar_solicitud_amistad"),
     path('aceptar_solicitud_amistad/', views_solicitudes_amistad.aceptar_solicitud_amistad, name='aceptar_solicitud_amistad'),
@@ -19,8 +24,9 @@ urlpatterns = [
     path('listar_solicitudes_amistad/', views_solicitudes_amistad.listar_solicitudes_amistad, name='listar_solicitudes_amistad'),
     path('eliminar_amigo/', views_solicitudes_amistad.eliminar_amigo, name='eliminar_amigo'),
     path('buscar_usuarios/', views_solicitudes_amistad.buscar_usuarios, name='buscar_usuarios'),
+    #######################################################################################################################################
     
-
+    #######################################################################################################################################
     # Relacionadas con estadísticas de usuarios
     # Usuarios ajenos
     path('racha_actual/<int:user_id>/', views_estadisticas.obtener_racha_actual, name="obtener_racha_actual"),
@@ -39,5 +45,10 @@ urlpatterns = [
     path('porcentaje_derrotas/', views_estadisticas.obtener_porcentaje_derrotas_autenticado, name='obtener_porcentaje_derrotas'),
     path('estadisticas/', views_estadisticas.obtener_usuario_estadisticas_autenticado, name='obtener_usuario_estadisticas'),
     path('elo/', views_estadisticas.obtener_elo_autenticado, name="obtener_elo"),
+    
+    #rankings
+    path('usuarios/top_elo/', views_estadisticas.obtener_top_elo, name="obtener_top_elo"),
+    
+    #######################################################################################################################################
 ]
  
