@@ -5,7 +5,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('usuarios/', include('usuarios.urls')),
     path('partidas/', include('partidas.urls')),
-    path('chat_partida/', include('chat_partida.urls')),
-    path('chat_global/', include('chat_global.urls'))
-    
+    path('mensajes/', include('chat_global.urls')),
+    path('chat_partida/', include('chat_partida.urls'))
 ]

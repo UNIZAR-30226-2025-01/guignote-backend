@@ -1,4 +1,6 @@
-Django      # Framework para backend de Python
-PyJWT       # Para la gestión de JSON Web Tokens
-gunicorn    # Servidor
-psycopg2    # Conector dde PostgreSQL con Python
+Django          # Framework para backend de Python
+PyJWT           # Para la gestión de JSON Web Tokens
+daphne          # Servidor
+channels        # WebSockets y canales desarrollo
+channels_redis  # WebSockets y canales despliegue
+psycopg2-binary # Conector dde PostgreSQL con Python
