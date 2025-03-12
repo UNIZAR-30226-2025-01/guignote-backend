@@ -97,7 +97,8 @@ def obtener_usuario_estadisticas(request, user_id):
             "total_partidas": total_games,
             "porcentaje_victorias": win_percentage,
             "porcentaje_derrotas": loss_percentage,
-            "elo": usuario.elo
+            "elo": usuario.elo,
+            "elo_parejas": usuario.elo_parejas
         }
 
         return JsonResponse(estadisticas)
@@ -193,6 +194,18 @@ def obtener_elo(request, user_id):
 
 @csrf_exempt
 @token_required
+def obtener_elo_parejas(request, user_id):
+    """
+    Devuelve el Elo actual de un usuario.
+    """
+    if request.method == "GET":
+        usuario = get_object_or_404(Usuario, id=user_id)
+        return JsonResponse({"user": usuario.nombre, "elo_parejas": usuario.elo_parejas}, status=200)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
+@csrf_exempt
+@token_required
 def obtener_elo_autenticado(request):
     """
     Devuelve el Elo actual del usuario autenticado.
@@ -203,6 +216,20 @@ def obtener_elo_autenticado(request):
         return JsonResponse({"user": usuario.nombre, "elo": usuario.elo}, status=200)
 
     return JsonResponse({"error": "Método no permitido"}, status=405)
+
+@csrf_exempt
+@token_required
+def obtener_elo_parejas_autenticado(request):
+    """
+    Devuelve el Elo actual del usuario autenticado.
+    El usuario autenticado se obtiene del token.
+    """
+    if request.method == "GET":
+        usuario = request.usuario  # Usuario autenticado extraído del token
+        return JsonResponse({"user": usuario.nombre, "elo_parejas": usuario.elo_parejas}, status=200)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
 
 
 @csrf_exempt
@@ -225,7 +252,8 @@ def obtener_usuario_estadisticas_autenticado(request):
             "total_partidas": total_games,
             "porcentaje_victorias": win_percentage,
             "porcentaje_derrotas": loss_percentage,
-            "elo": usuario.elo
+            "elo": usuario.elo,
+            "elo_parejas": usuario.elo_parejas
         }
 
         return JsonResponse(estadisticas)
@@ -250,5 +278,23 @@ def obtener_top_elo(request):
         ]
 
         return JsonResponse({"top_elo_players": ranking}, status=200)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
+@csrf_exempt
+def obtener_top_elo_parejas(request):
+    """
+    Returns the top 20 players with the highest Elo in `elo_parejas`.
+    """
+    if request.method == "GET":
+        top_players = Usuario.objects.order_by('-elo_parejas')[:20]
+
+        # Format response
+        ranking = [
+            {"nombre": player.nombre, "elo_parejas": player.elo_parejas}
+            for player in top_players
+        ]
+
+        return JsonResponse({"top_elo_parejas_players": ranking}, status=200)
 
     return JsonResponse({"error": "Método no permitido"}, status=405)

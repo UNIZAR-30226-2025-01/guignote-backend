@@ -52,7 +52,7 @@ class ChatGlobalTestCase(TestCase):
 
         # 🔹 Retrieve messages for Usuario1
         response_chat1 = self.client.get(
-            reverse('chat_global:obtener_mensajes_global', args=[self.usuario1.id]),
+            reverse('chat_global:obtener_mensajes_global'),
             HTTP_AUTH=self.token_usuario1
         )
         self.assertEqual(response_chat1.status_code, 200)
@@ -66,7 +66,7 @@ class ChatGlobalTestCase(TestCase):
 
         # 🔹 Retrieve messages for Usuario1
         response_chat2 = self.client.get(
-            reverse('chat_global:obtener_mensajes_global', args=[self.usuario2.id]),
+            reverse('chat_global:obtener_mensajes_global'),
             HTTP_AUTH=self.token_usuario2
         )
 
@@ -94,14 +94,3 @@ class ChatGlobalTestCase(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"], "Cannot send a message to yourself")
         
-        
-    def test_mirar_mensajes_ajenos(self):
-
-        response = self.client.get(
-            reverse('chat_global:obtener_mensajes_global', args=[self.usuario3.id]),
-            HTTP_AUTH=self.token_usuario1
-        )
-
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["error"], "Unauthorized: You can only view your own messages")
-

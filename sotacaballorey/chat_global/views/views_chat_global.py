@@ -46,7 +46,7 @@ def enviar_mensaje_global(request, user_id, mensaje):
 
 @csrf_exempt
 @token_required
-def obtener_mensajes_global(request, user_id):
+def obtener_mensajes_global(request):
     """
     Retrieves all messages sent or received by the authenticated user.
     """
@@ -54,9 +54,6 @@ def obtener_mensajes_global(request, user_id):
         try:
             usuario = request.usuario  # Get authenticated user
 
-            # Ensure the user is requesting their own messages
-            if usuario.id != user_id:
-                return JsonResponse({"error": "Unauthorized: You can only view your own messages"}, status=403)
 
             # Retrieve messages where the user is the sender or recipient
             mensajes = ChatGlobal.objects.filter(emisor=usuario) | ChatGlobal.objects.filter(receptor=usuario)

@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from partidas.models import Partida  # Import Partida (Match Object) from partidas app
 from usuarios.models import Usuario  # Import Usuario (User Object) from usuarios app
-from .elo import calcular_nuevo_elo  # Import Elo calculation function
+from ..elo import calcular_nuevo_elo  # Import Elo calculation function
 
 
 # Setup logger
