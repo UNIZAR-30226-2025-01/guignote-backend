@@ -24,6 +24,14 @@ def validar_token(token: str):
     except(jwt.ExpiredSignatureError, jwt.InvalidTokenError, Usuario.DoesNotExist):
         return None
     
+async def validar_token_async(token: str):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        usuario = await Usuario.objects.aget(id=payload['id'])
+        return usuario
+    except(jwt.ExpiredSignatureError, jwt.InvalidTokenError, Usuario.DoesNotExist):
+        return None
+
 def token_required(func):
     def wrapper(request, *args, **kwargs):
         token = request.headers.get('Auth')
