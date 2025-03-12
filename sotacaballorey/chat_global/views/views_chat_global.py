@@ -46,17 +46,25 @@ def enviar_mensaje_global(request, user_id, mensaje):
 
 @csrf_exempt
 @token_required
-def obtener_mensajes_global(request):
+def obtener_mensajes_global(request, user_id=None):
     """
-    Retrieves all messages sent or received by the authenticated user.
+    Retrieves all messages exchanged between the authenticated user and another user (if provided).
+    If no user_id is given, it returns all messages sent or received by the authenticated user.
     """
     if request.method == "GET":
         try:
             usuario = request.usuario  # Get authenticated user
 
+            # If a user_id is provided, filter messages exchanged between these two users
+            if user_id:
+                otro_usuario = get_object_or_404(Usuario, id=user_id)
 
-            # Retrieve messages where the user is the sender or recipient
-            mensajes = ChatGlobal.objects.filter(emisor=usuario) | ChatGlobal.objects.filter(receptor=usuario)
+                mensajes = ChatGlobal.objects.filter(emisor=usuario, receptor=otro_usuario) | \
+                           ChatGlobal.objects.filter(emisor=otro_usuario, receptor=usuario)
+            else:
+                # Retrieve all messages where the authenticated user is the sender or recipient
+                mensajes = ChatGlobal.objects.filter(emisor=usuario) | ChatGlobal.objects.filter(receptor=usuario)
+
             mensajes = mensajes.order_by("timestamp")  # Sort by oldest first
 
             # Serialize messages
