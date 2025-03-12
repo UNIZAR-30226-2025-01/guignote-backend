@@ -27,7 +27,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'channels'
 ]
 
 MIDDLEWARE = [
@@ -60,17 +59,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'sotacaballorey.wsgi.application'
 
-ASGI_APPLICATION = 'sotacaballorey.asgi.application'
-
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [(getenv('REDIS_HOST', '127.0.0.1'),
-                int(getenv('REDIS_PORT', 6379)))]
-        }
-    }
-}
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
