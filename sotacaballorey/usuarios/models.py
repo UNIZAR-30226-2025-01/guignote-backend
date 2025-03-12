@@ -20,6 +20,7 @@ class Usuario(models.Model):
     mayor_racha_victorias = models.IntegerField\
         (null=False, default=0, validators=[MinValueValidator(0)])
     elo = models.IntegerField(default=1200, validators=[MinValueValidator(0)])
+    elo_parejas = models.IntegerField(default=1200, validators=[MinValueValidator(0)])
     
     def __str__(self):
         return 'Usuario:\n' + \

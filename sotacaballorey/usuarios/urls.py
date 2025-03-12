@@ -36,6 +36,8 @@ urlpatterns = [
     path('porcentaje_derrotas/<int:user_id>/', views_estadisticas.obtener_porcentaje_derrotas, name='obtener_porcentaje_derrotas'),
     path('estadisticas/<int:user_id>/', views_estadisticas.obtener_usuario_estadisticas, name='obtener_usuario_estadisticas'),
     path('elo/<int:user_id>/', views_estadisticas.obtener_elo, name="obtener_elo"),
+    path('elo_parejas/<int:user_id>/', views_estadisticas.obtener_elo_parejas, name="obtener_elo_parejas"),
+    
     
     # Usuario propio (usando token)
     path('racha_actual/', views_estadisticas.obtener_racha_actual_autenticado, name="obtener_racha_actual"),
@@ -45,9 +47,11 @@ urlpatterns = [
     path('porcentaje_derrotas/', views_estadisticas.obtener_porcentaje_derrotas_autenticado, name='obtener_porcentaje_derrotas'),
     path('estadisticas/', views_estadisticas.obtener_usuario_estadisticas_autenticado, name='obtener_usuario_estadisticas'),
     path('elo/', views_estadisticas.obtener_elo_autenticado, name="obtener_elo"),
+    path('elo_parejas/', views_estadisticas.obtener_elo_parejas_autenticado, name="obtener_elo_parejas"),
     
     #rankings
     path('usuarios/top_elo/', views_estadisticas.obtener_top_elo, name="obtener_top_elo"),
+    path('usuarios/top_elo_parejas/', views_estadisticas.obtener_top_elo_parejas, name="obtener_top_elo_parejas"),
     
     #######################################################################################################################################
 ]

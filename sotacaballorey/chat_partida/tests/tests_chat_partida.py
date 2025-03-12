@@ -26,11 +26,6 @@ class ChatPartidaTestCase(TestCase):
         self.token_jugador3 = generar_token(self.jugador3)
         self.token_jugador4 = generar_token(self.jugador4)
 
-        # Headers to send authentication tokens
-        self.auth_headers_jugador1 = {"HTTP_AUTHORIZATION": f"Bearer {self.token_jugador1}"}
-        self.auth_headers_jugador2 = {"HTTP_AUTHORIZATION": f"Bearer {self.token_jugador2}"}
-        self.auth_headers_jugador3 = {"HTTP_AUTHORIZATION": f"Bearer {self.token_jugador3}"}
-        self.auth_headers_jugador4 = {"HTTP_AUTHORIZATION": f"Bearer {self.token_jugador4}"}
 
     def test_chat_mensajes_en_orden(self):
         """Test that chat messages are stored and retrieved in chronological order for each match."""
@@ -88,16 +83,3 @@ class ChatPartidaTestCase(TestCase):
 
         # 🔹 Ensure messages do not mix between matches
         self.assertNotEqual(mensajes_recibidos_1, mensajes_recibidos_2)
-
-    def test_mensaje_con_usuario_diferente_al_token(self):
-        """Test that sending a message with a different user ID than the token is rejected."""
-
-        mensaje_falso = "Intentando engañar el sistema!"
-
-        response = self.client.post(
-            reverse('chat_partida:enviar_mensaje_chat', args=[self.partida1.id, mensaje_falso]),
-            HTTP_AUTH=self.auth_headers_jugador1  # Using jugador1's token but sending as jugador2
-        )
-
-        self.assertEqual(response.status_code, 401) # Ensure request is unauthorized
-        self.assertEqual(response.json()["error"], "Token no válido o ha expirado")

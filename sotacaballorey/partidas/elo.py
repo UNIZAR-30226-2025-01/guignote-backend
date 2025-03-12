@@ -19,3 +19,32 @@ def calcular_nuevo_elo(rating_a, rating_b, resultado_a, k=32):
     nuevo_elo_b = rating_b + k * ((1 - resultado_a) - expectativa_b)
 
     return round(nuevo_elo_a), round(nuevo_elo_b)
+
+def calcular_nuevo_elo_parejas(elo_jugadores, elo_rivales, resultado, k=32):
+    """
+    Calculates the new Elo rating for 2v2 matches.
+
+    Parameters:
+    - elo_jugadores: List of two Elo ratings (team members).
+    - elo_rivales: List of two Elo ratings (opponents).
+    - resultado: 1 if the team won, 0 if they lost.
+    - k: K-factor (default 32, adjusts Elo change sensitivity).
+
+    Returns:
+    - New Elo ratings for both players in the team.
+    """
+
+    # Calculate average Elo for each team
+    elo_equipo = sum(elo_jugadores) / 2
+    elo_rivales = sum(elo_rivales) / 2
+
+    # Expected win probability using the standard Elo formula
+    expected_win_prob = 1 / (1 + 10 ** ((elo_rivales - elo_equipo) / 400))
+
+    # Elo update formula
+    nuevo_elo = [
+        round(elo + k * (resultado - expected_win_prob))
+        for elo in elo_jugadores
+    ]
+
+    return nuevo_elo
