@@ -91,7 +91,7 @@ class ChatGlobalTest(TestCase):
         )
 
         respuesta = self.client.get(
-            f'/mensajes/obtener/?chat_id={self.chat.id}',
+            f'/mensajes/obtener/?receptor_id={self.usuario2.id}',
             HTTP_AUTH=self.token_usuario1
         )
         self.assertEqual(respuesta.status_code, 200)
@@ -100,15 +100,15 @@ class ChatGlobalTest(TestCase):
             '¡Hola, unizar!'
         )
 
-        # Error por chat inexistente
+        # Error por receptor inexistente
         respuesta = self.cliente.get(
-            '/mensajes/obtener/?chat_id=-1',
+            '/mensajes/obtener/?receptor_id=-1',
             HTTP_AUTH=self.token_usuario1
         )
         self.assertEqual(respuesta.status_code, 404)
 
         # Error por falta de token
         respuesta = self.cliente.get(
-            f'/mensajes/obtener/?chat_id={self.chat.id}'
+            f'/mensajes/obtener/?receptor_id={self.usuario2.id}'
         )
         self.assertEqual(respuesta.status_code, 401)

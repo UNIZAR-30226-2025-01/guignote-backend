@@ -22,24 +22,25 @@ def enviar_mensaje(request):
     try:
         # Obtengo datos del cuerpo de la petición
         data = json.loads(request.body)
-        receptor = Usuario.objects.get(id=data.get('receptor_id'))
+        receptor_id = data.get('receptor_id')
         contenido = data.get('contenido', '').strip()
 
         # Mensaje vacío
-        if not contenido:
-            return JsonResponse({'error:': 'El mensaje no puede ser vacío'}, status=400)
-        
+        if not contenido or not receptor_id:
+            return JsonResponse({'error': 'Falta algún campo'}, status=400)
+
+        receptor = Usuario.objects.get(id=receptor_id)
         chat = obtener_o_crear_chat(request.usuario, receptor)
         if not chat:
             return JsonResponse({'error': 'Solo puedes chatear con amigos'}, status=403)
         
         # Guardar el mensaje
-        mensaje = Mensaje.objects.create(chat=chat, emisor=request.usuario, contenido=contenido)
+        Mensaje.objects.create(chat=chat, emisor=request.usuario, contenido=contenido)
         return JsonResponse({'mensaje': 'Mensaje enviado con éxito'}, status=201)
     
     except Usuario.DoesNotExist:
         return JsonResponse({'error': 'Usuario no encontrado'}, status=404)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, KeyError, ValueError):
         return JsonResponse({'error': 'Datos inválidos'}, status=400)
     
 
@@ -50,7 +51,7 @@ def obtener_mensajes(request):
     Obtener todos los mensajes de un chat
     ├─ Método HTTP: GET
     ├─ Cabecera petición con Auth:<token>
-    └─ Parámetros en la URL 'chat_id'
+    └─ Parámetros en la URL 'receptor_id'
     """
 
     # Error por método no permitido
@@ -58,21 +59,29 @@ def obtener_mensajes(request):
         return JsonResponse({'error':'Método no permitido'}, status=405)
     
     # Obtengo id del chat
-    chat_id = request.GET.get('chat_id')
+    receptor_id = request.GET.get('receptor_id')
+    
+    if not receptor_id:
+        return JsonResponse({'error': 'Falta el receptor_id'}, status=400)
 
     try:
-        chat = Chat.objects.get(id=chat_id)
-        # Obtengo mensajes
-        mensajes = chat.mensajes_glob.all().order_by('fecha_envio')
+        receptor = Usuario.objects.get(id=receptor_id)
+        chat = obtener_o_crear_chat(request.usuario, receptor)
+
+        if not chat:
+            return JsonResponse({'error': 'Solo puedes chatear con amigos'}, status=403)
+        
+        mensajes = chat.mensajes_glob.all().order_by('-fecha_envio')
         mensajes_json = [
             {
-                'emisor': mensaje.emisor.nombre,
+                'emisor': mensaje.emisor.id,
                 'contenido': mensaje.contenido,
                 'fecha_envio': mensaje.fecha_envio.strftime('%Y-%m-%d %H:%M:%S'),
             } for mensaje in mensajes
         ]
         return JsonResponse({'mensajes': mensajes_json}, status=200)
-
-    except Chat.DoesNotExist:
-        return JsonResponse({'error': 'Chat no encontrado'}, status=404)
+    except Usuario.DoesNotExist:
+        return JsonResponse({'error': 'Destinatario no encontrado'}, status=404)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'ID de destinatario inválido o datos incorrectos'}, status=400)
 

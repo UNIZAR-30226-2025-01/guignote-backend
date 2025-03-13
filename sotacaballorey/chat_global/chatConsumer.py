@@ -1,15 +1,14 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
+from .models import Chat, Mensaje, obtener_o_crear_chat
 from django.contrib.auth.models import AnonymousUser
 from asgiref.sync import sync_to_async
 from django.utils.timezone import now
-from .models import Chat, Mensaje
+from usuarios.models import Usuario
 import json
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-
-        self.chat_id = self.scope['url_route']['kwargs']['chat_id']
-        self.room_group_name = f'chat_{self.chat_id}'
+        self.receptor_id = self.scope['url_route']['kwargs']['receptor_id']
 
         # Obtengo usuario autenticado desde el middleware
         self.usuario = self.scope.get('usuario', AnonymousUser())
@@ -18,18 +17,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         try:
-            chat = await sync_to_async(Chat.objects.get)(id=self.chat_id)
-
-            usuario1_id = await sync_to_async(lambda: chat.usuario1.id)()
-            usuario2_id = await sync_to_async(lambda: chat.usuario2.id)()
-
-            if self.usuario.id not in [usuario1_id, usuario2_id]:
+            self.receptor = await sync_to_async(Usuario.objects.get)(id=self.receptor_id)
+            
+            self.chat = await sync_to_async(obtener_o_crear_chat)(self.usuario, self.receptor)
+            if not self.chat:
                 await self.close(code=403)
+                return
+            
+            self.chat_id = self.chat.id
+            self.room_group_name = f'chat_{self.chat_id}'
 
             await self.channel_layer.group_add(self.room_group_name, self.channel_name)
             await self.accept()
 
-        except Chat.DoesNotExist:
+        except Usuario.DoesNotExist:
             await self.close(code=403)
 
     async def disconnect(self, close_code):
@@ -38,34 +39,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        chat = await sync_to_async(Chat.objects.get)(id=self.chat_id)
+        try:
+            data = json.loads(text_data)
+            contenido = data.get('contenido', '').strip()
 
-        usuario1_id = await sync_to_async(lambda: chat.usuario1.id)()
-        usuario2_id = await sync_to_async(lambda: chat.usuario2.id)()
-
-        if data['emisor_id'] not in [usuario1_id, usuario2_id]:
-            await self.send(text_data=json.dumps({'error': 'No tienes permiso'}))
-            return
-        
-        mensaje = await sync_to_async(Mensaje.objects.create)(
-            chat_id=self.chat_id,
-            emisor_id=data['emisor_id'],
-            contenido=data['contenido'],
-            fecha_envio=now()
-        )
-
-        emisor_nombre = await sync_to_async(lambda: mensaje.emisor.nombre)()
-
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'emisor': emisor_nombre,
-                'contenido': mensaje.contenido,
-                'fecha_envio': mensaje.fecha_envio.strftime('%Y-%m-%d %H:%M:%S')
-            }
-        )
+            if not contenido:
+                await self.send(text_data=json.dumps({'error': 'El mensaje no puede estar vacío'}))
+                return
+            
+            mensaje = await sync_to_async(Mensaje.objects.create)(
+                chat=self.chat,
+                emisor=self.usuario,
+                contenido=contenido,
+                fecha_envio=now()
+            )
+            
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'emisor': self.usuario.id,
+                    'contenido': mensaje.contenido,
+                    'fecha_envio': mensaje.fecha_envio.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            )
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({'error': 'Formato de mensaje inválido'}))
+        except Usuario.DoesNotExist:
+            await self.send(text_data=json.dumps({'error': 'Receptor no encontrado'}))            
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event))
