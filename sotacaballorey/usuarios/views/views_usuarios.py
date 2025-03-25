@@ -132,7 +132,11 @@ def obtener_amigos(request):
         return JsonResponse({'error':'Método no permitido'}, status=405)
 
     # Obtener amigos
-    amigos_json = [{'id': amigo.id, 'nombre': amigo.nombre} for amigo in request.usuario.amigos.all()]
+    amigos_json = [{
+        'id': amigo.id,
+        'nombre': amigo.nombre,
+        'imagen': request.build_absolute_uri(amigo.imagen.url) if amigo.imagen else None
+    } for amigo in request.usuario.amigos.all()]
     
     return JsonResponse({'amigos': amigos_json}, status=200)
 
@@ -154,3 +158,39 @@ def obtener_id_por_nombre(request, username):
     except Exception as e:
         logger.error(f"Error retrieving user ID for username '{username}': {str(e)}")
         return JsonResponse({"error": "An error occurred while fetching the user ID"}, status=500)
+    
+@csrf_exempt
+@token_required
+def establecer_imagen(request):
+    """
+    Permite al usuario autenticado subir o actualizar su imagen de perfil
+    ├─ Método HTTP: POST
+    ├─ Cabecera: Auth:<token>
+    ├─ Cuerpo: multipart/form-data con campo 'imagen'
+    └─ Guarda la imagen redimensionada y comprimida como perfil
+    """
+
+    # Error por método no permitido
+    if request.method != 'POST':
+        return JsonResponse({'error':'Método no permitido'}, status=405)
+
+    # Obtengo imagen
+    f = request.FILES.get('imagen')
+
+    # Redimensionar imagen y comprimir
+    if not f or f.size > 2*1024*1024:
+        return JsonResponse({'error': 'Imagen no válida'}, 400)
+    try:
+        from PIL import Image
+        from io import BytesIO
+        from django.core.files.base import ContentFile
+
+        i = Image.open(f).convert('RGB')
+        s = 128 / min(i.size)
+        i = i.resize((int(i.width*s), int(i.height*s)), Image.ANTIALIAS)
+        x = (i.width - 128) // 2; y = (i.height - 128) // 2
+        i = i.crop((x, y, x+128, y+128))
+        b = BytesIO(); i.save(b, 'WEBP', quality=75); b.seek(0)
+        request.usuario.imagen.save(f"usuario_{request.usuario.id}.webp", ContentFile(b.read()), save=True)
+        return JsonResponse({'mensaje': 'Imagen actualizada'}, 200)
+    except: return JsonResponse({'error': 'Error procesando imagen'}, 500)

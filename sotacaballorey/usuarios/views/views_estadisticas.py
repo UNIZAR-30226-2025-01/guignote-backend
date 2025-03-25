@@ -98,7 +98,8 @@ def obtener_usuario_estadisticas(request, user_id):
             "porcentaje_victorias": win_percentage,
             "porcentaje_derrotas": loss_percentage,
             "elo": usuario.elo,
-            "elo_parejas": usuario.elo_parejas
+            "elo_parejas": usuario.elo_parejas,
+            "imagen": request.build_absolute_uri(usuario.imagen.url) if usuario.imagen else None
         }
 
         return JsonResponse(estadisticas)

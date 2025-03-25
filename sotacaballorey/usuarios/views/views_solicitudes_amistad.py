@@ -2,12 +2,9 @@ from utils.jwt_auth import token_required
 from django.views.decorators.csrf import csrf_exempt
 from usuarios.models import Usuario, SolicitudAmistad
 from django.http import JsonResponse
+from chat_global.models import Chat
 from django.db.models import Q
 import json
-import logging
-
-# Setup logging to capture errors
-logger = logging.getLogger(__name__)
 
 @csrf_exempt
 @token_required
@@ -25,7 +22,10 @@ def enviar_solicitud_amistad(request):
         return JsonResponse({'error':'Método no permitido'}, status=405)
     
     # Obtengo datos del cuerpo de la petición
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON incorrecto'}, status=400)
     destinatario_id = data.get('destinatario_id')
 
     # Error por campo vacío
@@ -46,6 +46,9 @@ def enviar_solicitud_amistad(request):
     # Verificar que la solicitud todavía no existe
     if SolicitudAmistad.objects.filter(emisor=request.usuario, receptor=destinatario).exists():
         return JsonResponse({'error':'La solicitud ya fue enviada'}, status=400)
+
+    if SolicitudAmistad.objects.filter(emisor=destinatario, receptor=request.usuario).exists():
+        return JsonResponse({'error': 'El destinatario ya te envió una solicitud'}, status=400)
 
     # Registrar solicitud de amistad
     solicitud = SolicitudAmistad(emisor=request.usuario, receptor=destinatario)
@@ -68,7 +71,10 @@ def aceptar_solicitud_amistad(request):
         return JsonResponse({'error':'Método no permitido'}, status=405)
 
     # Obtengo datos del cuerpo de la petición
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON incorrecto'}, status=400)
     solicitud_id = data.get('solicitud_id')
 
     # Error por campo vacío
@@ -107,7 +113,10 @@ def denegar_solicitud_amistad(request):
         return JsonResponse({'error':'Método no permitido'}, status=405)
 
     # Obtengo datos del cuerpo de la petición
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON incorrecto'}, status=400)
     solicitud_id = data.get('solicitud_id')
 
     # Error por campo vacío
@@ -145,7 +154,11 @@ def listar_solicitudes_amistad(request):
 
     # Obtener solicitudes pendientes
     solicitudes = SolicitudAmistad.objects.filter(receptor=request.usuario)
-    solicitudes_json = [{'id': s.id, 'solicitante': s.emisor.nombre} for s in solicitudes]
+    solicitudes_json = [{
+        'id': s.id,
+        'solicitante': s.emisor.nombre,
+        'imagen': request.build_absolute_uri(s.emisor.imagen.url) if s.emisor.imagen else None
+    } for s in solicitudes]
     
     return JsonResponse({'solicitudes': solicitudes_json}, status=200)
 
@@ -180,6 +193,12 @@ def eliminar_amigo(request):
 
     # Quitar amigo
     request.usuario.amigos.remove(amigo)
+
+    # Eliminar chat entre usuarios si existe
+    Chat.objects.filter(
+        usuario1=min(request.usuario, amigo, key=lambda u: u.id),
+        usuario2=max(request.usuario, amigo, key=lambda u: u.id)
+    ).delete()
 
     return JsonResponse({'mensaje': 'Amigo eliminado con éxito'}, status=200)
 
@@ -226,6 +245,10 @@ def buscar_usuarios(request):
     usuarios = Usuario.objects.filter(filtros)
     
     # Convertir a JSON
-    usuarios_json = [{'id': u.id, 'nombre': u.nombre} for u in usuarios]
+    usuarios_json = [{
+        'id': u.id,
+        'nombre': u.nombre,
+        'imagen': request.build_absolute_uri(u.imagen.url) if u.imagen else None
+    } for u in usuarios]
 
     return JsonResponse({'usuarios': usuarios_json}, status=200)

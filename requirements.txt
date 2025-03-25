@@ -4,3 +4,4 @@ daphne          # Servidor
 channels        # WebSockets y canales desarrollo
 channels_redis  # WebSockets y canales despliegue
 psycopg2-binary # Conector dde PostgreSQL con Python
+Pillow          # Manipular imágenes de perfil
