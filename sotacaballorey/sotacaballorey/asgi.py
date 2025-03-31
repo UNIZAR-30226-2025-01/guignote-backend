@@ -23,12 +23,14 @@ class TokenAuthMiddleware:
         parametros = parse_qs(query_string)
         token = parametros.get('token', [None])[0]
 
+
         if not token:
             print("No se encontró token en la URL. Cerrando conexión", flush=True)
             await send({'type': 'websocket.close', 'code': 403})
             return
         
         usuario = await validar_token_async(token)
+        
 
         if usuario:
             print(f"Usuario {usuario.nombre} autenticado en WebSocket", flush=True)

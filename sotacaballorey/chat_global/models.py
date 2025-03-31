@@ -27,6 +27,7 @@ class Mensaje(models.Model):
     class Meta:
         # Ordenar mensajes por fecha
         ordering = ['fecha_envio']
+        verbose_name_plural = 'Mensajes'
 
     def __str__(self):
         return f'Mensaje de {self.emisor.nombre} en chat {self.chat.id}'

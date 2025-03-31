@@ -50,8 +50,8 @@ urlpatterns = [
     path('elo_parejas/', views_estadisticas.obtener_elo_parejas_autenticado, name="obtener_elo_parejas"),
     
     #rankings
-    path('usuarios/top_elo/', views_estadisticas.obtener_top_elo, name="obtener_top_elo"),
-    path('usuarios/top_elo_parejas/', views_estadisticas.obtener_top_elo_parejas, name="obtener_top_elo_parejas"),
+    path('top_elo/', views_estadisticas.obtener_top_elo, name="obtener_top_elo"),
+    path('top_elo_parejas/', views_estadisticas.obtener_top_elo_parejas, name="obtener_top_elo_parejas"),
     
     #######################################################################################################################################
 ]

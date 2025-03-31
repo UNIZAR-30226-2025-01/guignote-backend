@@ -189,3 +189,18 @@ class PartidaTestCase(TestCase):
         self.assertEqual(overall_stats["total_partidas"], 11)
         self.assertAlmostEqual(overall_stats["porcentaje_victorias"], expected_win_percentage, places=1)
         self.assertAlmostEqual(overall_stats["porcentaje_derrotas"], expected_loss_percentage, places=1)
+
+    def test_obtener_chat_id_partida(self):
+            """Test retrieving the chat_id for a 1v1 match (Partida)."""
+
+            # Create a match
+            partida = Partida.objects.create(jugador_1=self.jugador1, jugador_2=self.jugador2)
+
+            # Ensure chat_id is assigned correctly
+            chat_id = partida.get_chat_id()
+            self.assertIsNotNone(chat_id)  # Ensure a valid chat_id is returned
+
+            # Retrieve chat_id through the view
+            response = self.client.get(reverse('obtener_chat_partida', args=[partida.id]))
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['chat_id'], chat_id)  # Ensure the chat_id is returned correctly
