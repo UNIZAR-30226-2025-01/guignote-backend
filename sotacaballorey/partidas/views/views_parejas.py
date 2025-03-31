@@ -145,3 +145,23 @@ def cambiar_estado_partida(request, partida_id):
             return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"error": "Método no permitido"}, status=405)
+
+@csrf_exempt
+def obtener_chat_partida_2v2(request, partida_id):
+    """
+    View to retrieve the chat_id for a specific 2v2 match (Partida2v2).
+    """
+    try:
+        # Get the match (Partida2v2) by partida_id
+        partida_2v2 = Partida2v2.objects.get(id=partida_id)
+        
+        # Retrieve the chat associated with this match
+        chat_id = partida_2v2.get_chat_id()
+        
+        if not chat_id:
+            return JsonResponse({'error': 'No chat associated with this match'}, status=404)
+        
+        return JsonResponse({'chat_id': chat_id}, status=200)
+    
+    except Partida2v2.DoesNotExist:
+        return JsonResponse({'error': 'Partida2v2 not found'}, status=404)

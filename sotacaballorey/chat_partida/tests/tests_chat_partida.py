@@ -1,85 +1,82 @@
+import json
 from django.test import TestCase
 from django.urls import reverse
-from partidas.models import Partida
+from chat_partida.models import MensajePartida
+from partidas.models import Partida, Partida2v2
 from usuarios.models import Usuario
-from chat_partida.models import ChatPartida
-from utils.jwt_auth import generar_token  # Import JWT generation function
+from utils.jwt_auth import generar_token  # Ensure token creation is handled correctly
 
-
-class ChatPartidaTestCase(TestCase):
-
+class TestChatMessages(TestCase):
     def setUp(self):
-        """Setup before each test - Create users, matches, and generate tokens."""
-        self.jugador1 = Usuario.objects.create(nombre="Carlos", correo="carlos@example.com", contrasegna="1234")
-        self.jugador2 = Usuario.objects.create(nombre="Elena", correo="elena@example.com", contrasegna="1234")
-
-        self.jugador3 = Usuario.objects.create(nombre="David", correo="david@example.com", contrasegna="1234")
-        self.jugador4 = Usuario.objects.create(nombre="Lucia", correo="lucia@example.com", contrasegna="1234")
-
-        # Create two separate matches
-        self.partida1 = Partida.objects.create(jugador_1=self.jugador1, jugador_2=self.jugador2)
-        self.partida2 = Partida.objects.create(jugador_1=self.jugador3, jugador_2=self.jugador4)
-
-        # Generate authentication tokens
-        self.token_jugador1 = generar_token(self.jugador1)
-        self.token_jugador2 = generar_token(self.jugador2)
-        self.token_jugador3 = generar_token(self.jugador3)
-        self.token_jugador4 = generar_token(self.jugador4)
-
-
-    def test_chat_mensajes_en_orden(self):
-        """Test that chat messages are stored and retrieved in chronological order for each match."""
-
-        # 🔹 Send messages to Match 1
-        mensajes_partida1 = [
-            ("Hola, buena suerte!", self.token_jugador1),
-            ("Igualmente!", self.token_jugador2),
-            ("Que empiece el juego!", self.token_jugador1)
-        ]
+        """
+        Setting up the test environment with users and matches.
+        Creates 5 1v1 and 5 2v2 matches, and two users for each match.
+        """
+        # Create users for testing using the custom Usuario model
+        self.user1 = Usuario.objects.create(nombre="user1", correo="user1@example.com", contrasegna="password")
+        self.user2 = Usuario.objects.create(nombre="user2", correo="user2@example.com", contrasegna="password")
+        self.user3 = Usuario.objects.create(nombre="user3", correo="user3@example.com", contrasegna="password")
+        self.user4 = Usuario.objects.create(nombre="user4", correo="user4@example.com", contrasegna="password")
         
+        self.token_usuario1 = generar_token(self.user1)
+        self.token_usuario2 = generar_token(self.user2)
+        self.token_usuario3 = generar_token(self.user3)
+        self.token_usuario4 = generar_token(self.user4)
 
-        for mensaje, headers in mensajes_partida1:
-            response = self.client.post(
-                reverse('chat_partida:enviar_mensaje_chat', args=[self.partida1.id, mensaje]),
-                HTTP_AUTH= headers
-            )
-            self.assertEqual(response.status_code, 201)  # Ensure messages are sent successfully
+        # Create 5 1v1 matches
+        self.matches_1v1 = [Partida.objects.create(jugador_1=self.user1, jugador_2=self.user2) for _ in range(5)]
+        
+        # Create 5 2v2 matches
+        self.matches_2v2 = [Partida2v2.objects.create(
+            equipo_1_jugador_1=self.user1,
+            equipo_1_jugador_2=self.user2,
+            equipo_2_jugador_1=self.user3,
+            equipo_2_jugador_2=self.user4
+        ) for _ in range(5)]
 
-        # 🔹 Send messages to Match 2
-        mensajes_partida2 = [
-            ("Hola, que gane el mejor!", self.token_jugador3),
-            ("Seguro, a jugar!", self.token_jugador4),
-            ("Vamos allá!", self.token_jugador3)
-        ]
+    def send_message_via_view(self, chat_id, user, message, token):
+        """
+        Helper function to send a message using the view `enviar_mensaje` (via HTTP POST).
+        """
+        return self.client.post(
+            reverse('chat_partida:enviar_mensaje_Partida'),
+            json.dumps({
+                'chat_id': chat_id,
+                'contenido': message
+            }), content_type='application/json',
+            HTTP_AUTH=token
+        )
 
-        for mensaje, headers in mensajes_partida2:
-            response = self.client.post(
-                reverse('chat_partida:enviar_mensaje_chat', args=[self.partida2.id, mensaje]),
-                HTTP_AUTH=headers
-            )
-            self.assertEqual(response.status_code, 201)
+    def test_send_message_and_store_in_db(self):
+        """
+        Test sending messages for each match type (1v1 and 2v2) and validate they are stored correctly.
+        """
+        # Test 1v1 Matches
+        for match in self.matches_1v1:
+            # Send two messages in the 1v1 match
+            message_1 = "Hello, ready for the match!"
+            message_2 = "Good luck!"
+            response1 = self.send_message_via_view(match.get_chat_id(), self.user1, message_1, self.token_usuario1)
+            response2 = self.send_message_via_view(match.get_chat_id(), self.user2, message_2, self.token_usuario2)
 
-        # 🔹 Retrieve messages for Match 1
-        response_partida1 = self.client.get(reverse('chat_partida:obtener_mensajes_chat', args=[self.partida1.id]), HTTP_AUTH=self.token_jugador1)
-        self.assertEqual(response_partida1.status_code, 200)
+            # Validate that the messages were stored in the database
+            messages = MensajePartida.objects.filter(chat_id=match.get_chat_id()).order_by('fecha_envio')
+            self.assertEqual(messages.count(), 2)
+            self.assertEqual(messages[0].contenido, message_1)
+            self.assertEqual(messages[1].contenido, message_2)
 
-        mensajes_recibidos_1 = response_partida1.json()["mensajes"]
-        self.assertEqual(len(mensajes_recibidos_1), 3)  # Ensure all 3 messages are retrieved
+        # Test 2v2 Matches
+        for match in self.matches_2v2:
+            # Send two messages in the 2v2 match
+            message_1 = "Let's do this!"
+            message_2 = "Hope we win!"
+            response1 = self.send_message_via_view(match.get_chat_id(), self.user1, message_1, self.token_usuario1)
+            response2 = self.send_message_via_view(match.get_chat_id(), self.user4, message_2, self.token_usuario4)
 
-        # 🔹 Check chronological order for Match 1
-        for i in range(len(mensajes_recibidos_1) - 1):
-            self.assertLessEqual(mensajes_recibidos_1[i]["timestamp"], mensajes_recibidos_1[i + 1]["timestamp"])
+            # Validate that the messages were stored in the database
+            messages = MensajePartida.objects.filter(chat_id=match.get_chat_id()).order_by('fecha_envio')
+            self.assertEqual(messages.count(), 2)
+            self.assertEqual(messages[0].contenido, message_1)
+            self.assertEqual(messages[1].contenido, message_2)
 
-        # 🔹 Retrieve messages for Match 2
-        response_partida2 = self.client.get(reverse('chat_partida:obtener_mensajes_chat', args=[self.partida2.id]), HTTP_AUTH=self.token_jugador3)
-        self.assertEqual(response_partida2.status_code, 200)
 
-        mensajes_recibidos_2 = response_partida2.json()["mensajes"]
-        self.assertEqual(len(mensajes_recibidos_2), 3)
-
-        # 🔹 Check chronological order for Match 2
-        for i in range(len(mensajes_recibidos_2) - 1):
-            self.assertLessEqual(mensajes_recibidos_2[i]["timestamp"], mensajes_recibidos_2[i + 1]["timestamp"])
-
-        # 🔹 Ensure messages do not mix between matches
-        self.assertNotEqual(mensajes_recibidos_1, mensajes_recibidos_2)

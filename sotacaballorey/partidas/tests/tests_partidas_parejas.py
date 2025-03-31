@@ -168,3 +168,21 @@ class Partida2v2TestCase(TestCase):
         self.jugadores[0].refresh_from_db()
         self.assertGreater(self.jugadores[0].elo_parejas, elo_antes)  # Elo should increase
 
+
+    def test_obtener_chat_id_partida_2v2(self):
+        """Test retrieving the chat_id for a 2v2 match (Partida2v2)."""
+
+        # Create a 2v2 match
+        partida_2v2 = Partida2v2.objects.create(
+            equipo_1_jugador_1=self.jugadores[0], equipo_1_jugador_2=self.jugadores[1],
+            equipo_2_jugador_1=self.jugadores[2], equipo_2_jugador_2=self.jugadores[3]
+        )
+
+        # Ensure chat_id is assigned correctly
+        chat_id = partida_2v2.get_chat_id()
+        self.assertIsNotNone(chat_id)  # Ensure a valid chat_id is returned
+
+        # Retrieve chat_id through the view
+        response = self.client.get(reverse('obtener_chat_partida_2v2', args=[partida_2v2.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['chat_id'], chat_id)  # Ensure the chat_id is returned correctly

@@ -1,93 +1,103 @@
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.timezone import now
+from utils.jwt_auth import token_required
+from chat_partida.models import MensajePartida, Chat_partida as Chat
+from usuarios.models import Usuario
 import json
 
-from partidas.models import Partida
-from chat_partida.models import ChatPartida
-from usuarios.models import Usuario
-from utils.jwt_auth import token_required  # Import the token decorator
+@csrf_exempt
+@token_required
+def enviar_mensaje(request):
+    """
+    Permite al usuario enviar un mensaje a un chat específico usando chat_id.
+    ├─ Método HTTP: POST
+    ├─ Cabecera petición con Auth:<token>
+    └─ Cuerpo JSON con 'chat_id' y 'contenido'
+    """
+    # Error por método no permitido
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    try:
+        # Obtengo datos del cuerpo de la petición
+        data = json.loads(request.body)
+        chat_id = data.get('chat_id')
+        contenido = data.get('contenido', '').strip()
 
+        # Validar campos requeridos
+        if not contenido or not chat_id:
+            return JsonResponse({'error': 'Falta algún campo'}, status=400)
 
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from django.utils.timezone import now
-from django.views.decorators.csrf import csrf_exempt
-from utils.jwt_auth import token_required  # Ensure this is correctly imported
-from chat_partida.models import ChatPartida
-from partidas.models import Partida
-from usuarios.models import Usuario
+        # Obtener el chat por chat_id
+        try:
+            chat = Chat.objects.get(id=chat_id)
+        except Chat.DoesNotExist:
+            return JsonResponse({'error': 'Chat no encontrado'}, status=404)
+
+        # Check if the user is a participant in the chat
+        user = request.usuario
+        if user not in chat.participants.all():
+            return JsonResponse({'error': 'User is not a participant in this chat'}, status=403)
+
+        # Crear el mensaje en el chat
+        MensajePartida.objects.create(
+            emisor=user,
+            contenido=contenido,
+            chat=chat  # Asociar el mensaje con el chat usando el chat_id
+        )
+        
+        return JsonResponse({'mensaje': 'Mensaje enviado con éxito'}, status=201)
+    
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return JsonResponse({'error': 'Datos inválidos'}, status=400)
 
 @csrf_exempt
 @token_required
-def enviar_mensaje_chat(request, partida_id, mensaje):
+def obtener_mensajes(request):
     """
-    Allows an authenticated user to post a chat message in a match.
-    The token must match the user sending the message.
+    Obtener todos los mensajes de un chat específico usando chat_id.
+    ├─ Método HTTP: GET
+    ├─ Cabecera petición con Auth:<token>
+    └─ Parámetro en la URL 'chat_id'
     """
-    if request.method == "POST":
-        try:
-            usuario = request.usuario  # Get user from token authentication
+    # Error por método no permitido
+    if request.method != 'GET':
+        return JsonResponse({'error':'Método no permitido'}, status=405)
+    
+    # Obtengo el parámetro chat_id de la URL
+    chat_id = request.GET.get('chat_id')
+    
+    if not chat_id:
+        return JsonResponse({'error': 'Falta parámetro chat_id'}, status=400)
 
-            # Validate fields
-            if not mensaje:
-                return JsonResponse({"error": "Message cannot be empty"}, status=400)
+    try:
+        # Obtener el chat por chat_id
+        chat = Chat.objects.get(id=chat_id)
+        
+        # Check if the user is a participant in the chat
+        user = request.usuario
+        if user not in chat.participants.all():
+            return JsonResponse({'error': 'User is not a participant in this chat'}, status=403)
 
-            # Get match and user
-            partida = get_object_or_404(Partida, id=partida_id)
+        # Obtener todos los mensajes asociados al chat
+        mensajes = MensajePartida.objects.filter(chat=chat).order_by('-fecha_envio')
+        
+        if not mensajes:
+            return JsonResponse({'error': 'No hay mensajes para este chat'}, status=404)
 
-            # Ensure the user is part of the match
-            if usuario not in [partida.jugador_1, partida.jugador_2]:
-                return JsonResponse({"error": "User is not part of this match"}, status=403)
+        # Preparar los mensajes para la respuesta
+        mensajes_json = [
+            {
+                'emisor': mensaje.emisor.id,
+                'contenido': mensaje.contenido,
+                'fecha_envio': mensaje.fecha_envio.strftime('%Y-%m-%d %H:%M:%S'),
+            } for mensaje in mensajes
+        ]
+        
+        return JsonResponse({'mensajes': mensajes_json}, status=200)
 
-            # Create the chat message
-            chat_mensaje = ChatPartida.objects.create(
-                partida=partida,
-                usuario=usuario,
-                mensaje=mensaje,
-                timestamp=now()
-            )
+    except Chat.DoesNotExist:
+        return JsonResponse({'error': 'Chat no encontrado'}, status=404)
 
-            return JsonResponse({
-                "message": "Mensaje enviado",
-                "mensaje_id": chat_mensaje.id,
-                "usuario": usuario.nombre,
-                "timestamp": chat_mensaje.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            }, status=201)
-
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-
-    return JsonResponse({"error": "Método no permitido"}, status=405)
-
-
-@csrf_exempt
-@token_required
-def obtener_mensajes_chat(request, partida_id):
-    """
-    Retrieves all messages from a match for an authenticated user.
-    The user must be part of the match.
-    """
-    if request.method == "GET":
-        try:
-            partida = get_object_or_404(Partida, id=partida_id)
-
-            # Ensure the user is part of the match
-            if request.usuario not in [partida.jugador_1, partida.jugador_2]:
-                return JsonResponse({"error": "Unauthorized: User is not part of this match"}, status=403)
-
-            mensajes = ChatPartida.objects.filter(partida=partida).order_by("timestamp")
-
-            mensajes_lista = [{
-                "usuario": mensaje.usuario.nombre,
-                "mensaje": mensaje.mensaje,
-                "timestamp": mensaje.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            } for mensaje in mensajes]
-
-            return JsonResponse({"mensajes": mensajes_lista}, status=200)
-
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
-
-    return JsonResponse({"error": "Método no permitido"}, status=405)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Datos incorrectos'}, status=400)

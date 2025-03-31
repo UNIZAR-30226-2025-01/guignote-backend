@@ -178,3 +178,23 @@ def cambiar_estado_partida(request, partida_id):
         return JsonResponse({"error": "Winner not found"}, status=404)
     except Exception as e:
         return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
+    
+@csrf_exempt
+def obtener_chat_partida(request, partida_id):
+    """
+    View to retrieve the chat_id for a specific 1v1 match (Partida).
+    """
+    try:
+        # Get the match (Partida) by partida_id
+        partida = Partida.objects.get(id=partida_id)
+        
+        # Retrieve the chat associated with this match
+        chat_id = partida.get_chat_id()
+        
+        if not chat_id:
+            return JsonResponse({'error': 'No chat associated with this match'}, status=404)
+        
+        return JsonResponse({'chat_id': chat_id}, status=200)
+    
+    except Partida.DoesNotExist:
+        return JsonResponse({'error': 'Partida not found'}, status=404)
