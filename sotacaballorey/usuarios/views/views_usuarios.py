@@ -179,7 +179,7 @@ def establecer_imagen(request):
 
     # Redimensionar imagen y comprimir
     if not f or f.size > 2*1024*1024:
-        return JsonResponse({'error': 'Imagen no válida'}, 400)
+        return JsonResponse({'error': 'Imagen no válida'}, status=400)
     try:
         from PIL import Image
         from io import BytesIO
@@ -187,10 +187,11 @@ def establecer_imagen(request):
 
         i = Image.open(f).convert('RGB')
         s = 128 / min(i.size)
-        i = i.resize((int(i.width*s), int(i.height*s)), Image.ANTIALIAS)
+        i = i.resize((int(i.width*s), int(i.height*s)), Image.Resampling.LANCZOS)
         x = (i.width - 128) // 2; y = (i.height - 128) // 2
         i = i.crop((x, y, x+128, y+128))
         b = BytesIO(); i.save(b, 'WEBP', quality=75); b.seek(0)
         request.usuario.imagen.save(f"usuario_{request.usuario.id}.webp", ContentFile(b.read()), save=True)
-        return JsonResponse({'mensaje': 'Imagen actualizada'}, 200)
-    except: return JsonResponse({'error': 'Error procesando imagen'}, 500)
+        return JsonResponse({'mensaje': 'Imagen actualizada'}, status=200)
+    except Exception as e:
+        return JsonResponse({'error': 'Error procesando imagen'}, status=500)
