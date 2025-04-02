@@ -12,13 +12,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         Called when the WebSocket is handshaking as part of the connection process.
         """
         # Extract match_type and match_id from the URL path
-        path = self.scope['path']
+        
         self.usuario = self.scope.get('usuario', AnonymousUser())
-        print(self.usuario.nombre)
+        path = self.scope['path']
         path_parts = path.split('/')
 
-        self.match_type = path_parts[2]  # '1v1' or '2v2'
-        self.match_id = path_parts[3]   # match_id
+        self.match_type = path_parts[3]  # '1v1' or '2v2'
+        self.match_id = path_parts[4]   # match_id
 
         self.room_group_name = f"chat_{self.match_type}_{self.match_id}"
 
@@ -27,8 +27,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         if match:
             # Get the chat associated with the match
-            self.chat = sync_to_async(match.get_chat_id)
-
+            self.chat = await sync_to_async(self.chat_id)(match)
             # Ensure the user is part of the match (check chat participants)
             if  await sync_to_async(self.is_user_in_match)(self.usuario, match):
                 # Add user to the WebSocket group
@@ -70,7 +69,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         "user": user.nombre,
                     }
                 )
-
+    def chat_id(self, match):
+        return match.get_chat_id()
+    
     async def chat_message(self, event):
         """
         Send the message to the WebSocket.
@@ -126,7 +127,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     def save_message(self, user, message):
         """Save the message to the associated chat."""
-        chat = Chat.objects.get(id=self.match_id)
+        chat = Chat.objects.get(id=self.chat)
         MensajePartida.objects.create(
             emisor=user,
             contenido=message,

@@ -6,6 +6,7 @@ django.setup()
 
 from channels.routing import ProtocolTypeRouter, URLRouter
 from chat_global.routing import websocket_urlpatterns
+from chat_partida.routing import websocket_urlpatterns_partida
 from django.contrib.auth.models import AnonymousUser
 from django.core.asgi import get_asgi_application
 from utils.jwt_auth import validar_token_async
@@ -46,5 +47,5 @@ class TokenAuthMiddleware:
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": TokenAuthMiddleware(
-        URLRouter(websocket_urlpatterns))
+        URLRouter(websocket_urlpatterns + websocket_urlpatterns_partida))
 })

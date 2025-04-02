@@ -253,7 +253,7 @@ def obtener_usuario_estadisticas_autenticado(request):
             "porcentaje_victorias": win_percentage,
             "porcentaje_derrotas": loss_percentage,
             "elo": usuario.elo,
-            "elo_parejas": usuario.elo_parejas
+            "elo_parejas": usuario.elo_parejas,
         }
 
         return JsonResponse(estadisticas)
