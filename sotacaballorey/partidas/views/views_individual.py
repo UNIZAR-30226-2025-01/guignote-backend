@@ -30,6 +30,7 @@ def crear_partida(request):
                 turno_actual=jugador1  # First turn goes to player 1
             )
             barajar_cartas(partida)  # Shuffle and deal cards
+            partida.save()
 
             logger.info(f"New match created: {partida.id} between {jugador1.nombre} and {jugador2.nombre}")
 
@@ -44,6 +45,7 @@ def crear_partida(request):
 
     logger.warning("Invalid request method for crear_partida")
     return JsonResponse({"error": "Método no permitido"}, status=405)
+
 
 
 def barajar_cartas(partida):

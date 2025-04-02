@@ -6,6 +6,7 @@ from usuarios.models import Usuario
 from utils.jwt_auth import generar_token
 from channels.testing import WebsocketCommunicator
 from chat_partida.chatConsumer import ChatConsumer
+from sotacaballorey.asgi import application
 from django.conf import settings
 import json
 import asyncio
@@ -27,15 +28,6 @@ class TestWebSocketCommunication(TestCase):
         # Create a 1v1 match
         self.match = Partida.objects.create(jugador_1=self.user1, jugador_2=self.user2)
 
-        # Create a chat for the match
-        self.chat = Chat.objects.create()
-        self.match.chat = self.chat
-        self.match.save()
-
-        # Add participants to the chat
-        self.chat.add_participant(self.user1)
-        self.chat.add_participant(self.user2)
-
 
     async def test_message_send_and_receive(self):
         """
@@ -46,8 +38,6 @@ class TestWebSocketCommunication(TestCase):
         # Base URL for the WebSocket (adjust according to your actual host and port)
         host = "localhost"  # Typically, this will be 'localhost' or your domain
         port = 8000  # Example if you have a custom port defined in your settings (or default to 8000)
-        print(host)
-        print(port)
         # Construct the WebSocket URL for a 1v1 match (Partida)
         url1 = f"ws://{host}:{port}/ws/chat/1v1/{self.match.id}/?token={self.token_usuario1}"
         url2 = f"ws://{host}:{port}/ws/chat/1v1/{self.match.id}/?token={self.token_usuario2}"
@@ -57,9 +47,9 @@ class TestWebSocketCommunication(TestCase):
         
 
 
-        communicator1 =  WebsocketCommunicator(ChatConsumer.as_asgi(), url1)
+        communicator1 =  WebsocketCommunicator(application, url1)
         connected1, subprotocol1 = await communicator1.connect()
-        communicator2 =  WebsocketCommunicator(ChatConsumer.as_asgi(), url2)
+        communicator2 =  WebsocketCommunicator(application, url2)
         connected2, subprotocol2 = await communicator2.connect()
 
 

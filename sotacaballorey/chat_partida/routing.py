@@ -3,7 +3,7 @@ from chat_partida.chatConsumer import ChatConsumer
 
 app_name = 'chat_partida'
 
-websocket_urlpatterns = [
+websocket_urlpatterns_partida = [
     # WebSocket URL for 1v1 matches (Partida)
     path('ws/chat/1v1/<int:match_id>/', ChatConsumer.as_asgi(), name='chat_websocket_1v1'),
 

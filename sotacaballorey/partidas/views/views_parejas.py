@@ -33,6 +33,7 @@ def crear_partida(request):
                 equipo_2_jugador_2=equipo_2_jugador_2,
                 turno_actual=equipo_1_jugador_1  # First player in Team 1 starts
             )
+            partida.save()
 
             return JsonResponse({"message": "Partida 2v2 creada", "partida_id": partida.id}, status=201)
 
