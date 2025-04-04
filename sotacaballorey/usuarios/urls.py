@@ -52,6 +52,8 @@ urlpatterns = [
     #rankings
     path('top_elo/', views_estadisticas.obtener_top_elo, name="obtener_top_elo"),
     path('top_elo_parejas/', views_estadisticas.obtener_top_elo_parejas, name="obtener_top_elo_parejas"),
+    path('top_elo_amigos/', views_estadisticas.obtener_top_elo_amigos, name="obtener_top_elo_amigos"),
+    path('top_elo_parejas_amigos/', views_estadisticas.obtener_top_elo_parejas_amigos, name="obtener_top_elo_parejas_amigos"),
     
     #######################################################################################################################################
 ]

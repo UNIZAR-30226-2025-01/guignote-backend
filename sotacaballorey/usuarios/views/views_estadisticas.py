@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from usuarios.models import Usuario
 from django.http import JsonResponse
+from django.db.models import Q
 import json
 import logging
 
@@ -291,6 +292,73 @@ def obtener_top_elo_parejas(request):
     if request.method == "GET":
         top_players = Usuario.objects.order_by('-elo_parejas')[:20]
 
+        # Format response
+        ranking = [
+            {"nombre": player.nombre, "elo_parejas": player.elo_parejas}
+            for player in top_players
+        ]
+
+        return JsonResponse({"top_elo_parejas_players": ranking}, status=200)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from utils.jwt_auth import validar_token_async  # Assuming this is the utility for token validation
+
+@csrf_exempt
+@token_required
+def obtener_top_elo_amigos(request):
+    """
+    Returns the top 20 players with the highest Elo rating for friends only.
+    """
+
+    if request.method == "GET":
+        # Validate token and get the user
+        user = request.usuario
+
+        if not user:
+            return JsonResponse({"error": "Token inválido"}, status=401)
+
+        # Get all friends of the current user
+        friends = user.amigos.all()
+
+        top_players = Usuario.objects.filter(
+            Q(id__in=friends) | Q(id=user.id)  # Include the user's ID
+        ).order_by('-elo')[:20]
+
+        # Format response
+        ranking = [
+            {"nombre": player.nombre, "elo": player.elo}
+            for player in top_players
+        ]
+
+        return JsonResponse({"top_elo_players": ranking}, status=200)
+
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
+
+@csrf_exempt
+@token_required
+def obtener_top_elo_parejas_amigos(request):
+    """
+    Returns the top 20 players with the highest Elo in `elo_parejas` for friends only.
+    """
+
+    if request.method == "GET":
+        # Validate token and get the user
+        user = request.usuario
+
+        if not user:
+            return JsonResponse({"error": "Token inválido"}, status=401)
+
+        # Get all friends of the current user
+        friends = user.amigos.all()
+
+        # Retrieve the top Elo players among friends in elo_parejas
+        top_players = Usuario.objects.filter(
+            Q(id__in=friends) | Q(id=user.id)  # Include the user's ID
+        ).order_by('-elo_parejas')[:20]
         # Format response
         ranking = [
             {"nombre": player.nombre, "elo_parejas": player.elo_parejas}
