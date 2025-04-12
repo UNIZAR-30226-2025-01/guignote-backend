@@ -4,9 +4,11 @@ import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sotacaballorey.settings')
 django.setup()
 
+from chat_partida.routing import websocket_urlpatterns as ws_urls_chatPartida
+from chat_global.routing import websocket_urlpatterns as ws_urls_chatGlobal
+from partidas.routing import websocket_urlpatterns as ws_urls_partidas
 from channels.routing import ProtocolTypeRouter, URLRouter
 from chat_global.routing import websocket_urlpatterns
-from chat_partida.routing import websocket_urlpatterns_partida
 from django.contrib.auth.models import AnonymousUser
 from django.core.asgi import get_asgi_application
 from utils.jwt_auth import validar_token_async
@@ -47,5 +49,5 @@ class TokenAuthMiddleware:
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": TokenAuthMiddleware(
-        URLRouter(websocket_urlpatterns + websocket_urlpatterns_partida))
+        URLRouter(ws_urls_chatGlobal + ws_urls_partidas + ws_urls_chatPartida))
 })

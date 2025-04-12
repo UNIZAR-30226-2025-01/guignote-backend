@@ -10,11 +10,8 @@ class Usuario(models.Model):
         (max_length=128, blank=False, null=False, unique=False)
     amigos = models.ManyToManyField\
         ('self', symmetrical=True, blank=True)
-    imagen = models.ImageField(
-        upload_to='imagenes_perfil/',
-        default='imagenes_perfil/default.webp',
-        blank=True, null=True
-    )
+    imagen = models.ImageField\
+        (upload_to='imagenes_perfil/', blank=True, null=True)
 
     # Puntuaciones
     victorias = models.IntegerField\

@@ -22,15 +22,17 @@ ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
-    'usuarios', 'partidas', 'chat_partida', 'chat_global',
+    'usuarios', 'chat_global', 'chat_partida', 'partidas',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'channels'
+    'channels',
 ]
+
+SOCKETIO_MESSAGE_QUEUE = 'redis://localhost:6379/0'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

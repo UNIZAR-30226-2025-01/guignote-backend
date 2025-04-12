@@ -1,10 +1,10 @@
 import json
-from django.test import TestCase
-from django.urls import reverse
-from chat_partida.models import MensajePartida
-from partidas.models import Partida, Partida2v2
+from django.test import TestCase, Client
+from chat_partida.models import Chat_partida, MensajePartida
+from partidas.models import Partida, JugadorPartida
 from usuarios.models import Usuario
-from utils.jwt_auth import generar_token  # Ensure token creation is handled correctly
+from utils.jwt_auth import generar_token
+from django.urls import reverse
 
 class TestChatMessages(TestCase):
     def setUp(self):
@@ -12,6 +12,8 @@ class TestChatMessages(TestCase):
         Setting up the test environment with users and matches.
         Creates 5 1v1 and 5 2v2 matches, and two users for each match.
         """
+        self.client = Client()
+
         # Create users for testing using the custom Usuario model
         self.user1 = Usuario.objects.create(nombre="user1", correo="user1@example.com", contrasegna="password")
         self.user2 = Usuario.objects.create(nombre="user2", correo="user2@example.com", contrasegna="password")
@@ -24,17 +26,24 @@ class TestChatMessages(TestCase):
         self.token_usuario4 = generar_token(self.user4)
 
         # Create 5 1v1 matches
-        self.matches_1v1 = [Partida.objects.create(jugador_1=self.user1, jugador_2=self.user2) for _ in range(5)]
+        self.matches_1v1 = []
+        for _ in range(5):
+            partida = Partida.objects.create(capacidad=2)
+            JugadorPartida.objects.create(partida=partida, usuario=self.user1, equipo=1)
+            JugadorPartida.objects.create(partida=partida, usuario=self.user2, equipo=2)
+            self.matches_1v1.append(partida)
         
         # Create 5 2v2 matches
-        self.matches_2v2 = [Partida2v2.objects.create(
-            equipo_1_jugador_1=self.user1,
-            equipo_1_jugador_2=self.user2,
-            equipo_2_jugador_1=self.user3,
-            equipo_2_jugador_2=self.user4
-        ) for _ in range(5)]
+        self.matches_2v2 = []
+        for _ in range(5):
+            partida = Partida.objects.create(capacidad=4)
+            JugadorPartida.objects.create(partida=partida, usuario=self.user1, equipo=1)
+            JugadorPartida.objects.create(partida=partida, usuario=self.user2, equipo=1)
+            JugadorPartida.objects.create(partida=partida, usuario=self.user3, equipo=2)
+            JugadorPartida.objects.create(partida=partida, usuario=self.user4, equipo=2)
+            self.matches_2v2.append(partida)
 
-    def send_message_via_view(self, chat_id, user, message, token):
+    def send_message_via_view(self, chat_id, message, token):
         """
         Helper function to send a message using the view `enviar_mensaje` (via HTTP POST).
         """
@@ -53,11 +62,15 @@ class TestChatMessages(TestCase):
         """
         # Test 1v1 Matches
         for match in self.matches_1v1:
+            match.chat.add_participant(self.user1)
+            match.chat.add_participant(self.user2)
+
             # Send two messages in the 1v1 match
+
             message_1 = "Hello, ready for the match!"
             message_2 = "Good luck!"
-            response1 = self.send_message_via_view(match.get_chat_id(), self.user1, message_1, self.token_usuario1)
-            response2 = self.send_message_via_view(match.get_chat_id(), self.user2, message_2, self.token_usuario2)
+            response1 = self.send_message_via_view(match.get_chat_id(), message_1, self.token_usuario1)
+            response2 = self.send_message_via_view(match.get_chat_id(), message_2, self.token_usuario2)
 
             # Validate that the messages were stored in the database
             messages = MensajePartida.objects.filter(chat_id=match.get_chat_id()).order_by('fecha_envio')
@@ -67,11 +80,16 @@ class TestChatMessages(TestCase):
 
         # Test 2v2 Matches
         for match in self.matches_2v2:
+            match.chat.add_participant(self.user1)
+            match.chat.add_participant(self.user2)
+            match.chat.add_participant(self.user3)
+            match.chat.add_participant(self.user4)
+
             # Send two messages in the 2v2 match
             message_1 = "Let's do this!"
             message_2 = "Hope we win!"
-            response1 = self.send_message_via_view(match.get_chat_id(), self.user1, message_1, self.token_usuario1)
-            response2 = self.send_message_via_view(match.get_chat_id(), self.user4, message_2, self.token_usuario4)
+            response1 = self.send_message_via_view(match.get_chat_id(), message_1, self.token_usuario1)
+            response2 = self.send_message_via_view(match.get_chat_id(), message_2, self.token_usuario4)
 
             # Validate that the messages were stored in the database
             messages = MensajePartida.objects.filter(chat_id=match.get_chat_id()).order_by('fecha_envio')

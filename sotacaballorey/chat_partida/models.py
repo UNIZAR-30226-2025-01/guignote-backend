@@ -1,8 +1,6 @@
 from django.db import models
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
-from usuarios.models import Usuario  # Ensure this is correctly imported
-from django.utils.timezone import now  # To automatically store timestamps
+from usuarios.models import Usuario
+from django.utils.timezone import now
 
 class Chat_partida(models.Model):
     """
@@ -12,17 +10,32 @@ class Chat_partida(models.Model):
     # Many-to-many relationship with users (participants in the chat)
     participants = models.ManyToManyField(Usuario, related_name="chat_participations")
     
-    def add_participant(self, user):
+    def add_participant(self, user) -> bool:
         """
         Add a participant to the chat.
         """
-        self.participants.add(user)
+        from partidas.models import JugadorPartida
+        try:
+            partida: Partida = self.chat_partida
+            if not JugadorPartida.objects.filter(partida=partida, usuario=user).exists():
+                return False
+            self.participants.add(user)
+            return True
+        except Partida.DoesNotExist:
+            return False
 
     def remove_participant(self, user):
         """
         Remove a participant from the chat.
         """
-        self.participants.remove(user)
+        from partidas.models import JugadorPartida
+        try:
+            partida: Partida = self.chat_partida
+            if not JugadorPartida.objects.filter(partida=partida, usuario=user).exists():
+                return False
+            self.participants.remove(user)
+        except Partida.DoesNotExist:
+            return False
 
     def get_participants(self):
         """

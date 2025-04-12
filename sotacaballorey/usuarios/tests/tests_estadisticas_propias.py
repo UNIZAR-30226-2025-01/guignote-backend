@@ -89,7 +89,7 @@ class EstadisticasUsuarioTestCase(TestCase):
             "mayor_racha_victorias": self.usuario1.mayor_racha_victorias,
             "total_partidas": self.usuario1.victorias + self.usuario1.derrotas,
             "porcentaje_victorias": round((self.usuario1.victorias / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2),
-            "imagen": 'http://testserver/media/imagenes_perfil/default.webp',
+            "imagen": None,
             "porcentaje_derrotas": round((self.usuario1.derrotas / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2),
             "elo_parejas": 1200,
             "elo": 1200

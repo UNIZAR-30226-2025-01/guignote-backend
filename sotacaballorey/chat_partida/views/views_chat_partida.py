@@ -82,8 +82,8 @@ def obtener_mensajes(request):
         # Obtener todos los mensajes asociados al chat
         mensajes = MensajePartida.objects.filter(chat=chat).order_by('-fecha_envio')
         
-        if not mensajes:
-            return JsonResponse({'error': 'No hay mensajes para este chat'}, status=404)
+        if not mensajes.exists():
+            return JsonResponse({'mensajes': []}, status=200)
 
         # Preparar los mensajes para la respuesta
         mensajes_json = [

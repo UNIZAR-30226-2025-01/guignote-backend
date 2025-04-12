@@ -1,113 +1,70 @@
-from django.db import models
-from usuarios.models import Usuario
+from django.core.validators import MinValueValidator, MaxValueValidator
 from chat_partida.models import Chat_partida
+from usuarios.models import Usuario
+from django.db import models
 
+ESTADOS_PARTIDA = [
+    ('esperando', 'Esperando'),
+    ('jugando', 'Jugando'),
+    ('terminada', 'Terminada'),
+]
 
 class Partida(models.Model):
-    chat = models.OneToOneField(Chat_partida, on_delete=models.CASCADE, related_name='chat_partida', null=True, blank=True)
-    jugador_1 = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="partidas_jugador1")
-    jugador_2 = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="partidas_jugador2")
-    triunfo_palo = models.CharField(max_length=10, choices=[('oros', 'Oros'), ('copas', 'Copas'), ('espadas', 'Espadas'), ('bastos', 'Bastos')])
-    ganador = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="partidas_ganadas")
-    mazo_restante = models.JSONField(default=list)
-    cartas_jugador_1 = models.JSONField(default=list)
-    cartas_jugador_2 = models.JSONField(default=list)
-    cartas_jugadas = models.JSONField(default=list)
-    puntos_jugador_1 = models.IntegerField(default=0)
-    puntos_jugador_2 = models.IntegerField(default=0)
-    turno_actual = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="turno_actual")
-    estado_partida = models.CharField(max_length=15, choices=[('EN_JUEGO', 'En juego'), ('FINALIZADO', 'Finalizado')], default='EN_JUEGO')
+    """Modelo que representa una partida de guiñote"""
+    chat = models.OneToOneField(
+        Chat_partida, on_delete=models.CASCADE, related_name='chat_partida', null=True, blank=True
+    )
+    capacidad = models.IntegerField(
+        choices=[(2, 2), (4, 4)], default=2
+    )
+    estado = models.CharField(
+        max_length=9, choices=ESTADOS_PARTIDA, default='esperando'
+    )
+    puntos_equipo_1 = models.IntegerField(
+        default=0, validators=[MinValueValidator(0)]
+    )
+    puntos_equipo_2 = models.IntegerField(
+        default=0, validators=[MinValueValidator(0)]
+    )
+    estado_json = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
-        return f"Partida entre {self.jugador_1.nombre} y {self.jugador_2.nombre} ({self.estado_partida})"
+        return f'Partida {self.id} - {self.capacidad} jugadores ({self.estado})'
     
-    def save(self, *args, **kwargs):
-        """
-        Override save method to create and associate a chat room when the match is saved.
-        """
-        # If this is a new match, create a chat room and add participants
+    def get_chat_id(self):
         if not self.chat:
-            # Create a new chat room for the match
             chat = Chat_partida.objects.create()
             self.chat = chat
-            
-            # After saving the match, add the players to the chat
-            self.chat.add_participant(self.jugador_1)
-            self.chat.add_participant(self.jugador_2)
-        
-        super(Partida, self).save(*args, **kwargs)  # Save the match
+            self.save()
+        return self.chat.id
 
-
-        
-    def get_chat_id(self):
-        """
-        Override the method to return the chat ID for this specific match.
-        """
-        return self.chat.id if self.chat else None
-    
-
-
-class Partida2v2(models.Model):
-    chat = models.OneToOneField(Chat_partida, on_delete=models.CASCADE, related_name='chat_partida2v2', null=True, blank=True)
-    equipo_1_jugador_1 = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="partidas_equipo1_jugador1")
-    equipo_1_jugador_2 = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="partidas_equipo1_jugador2")
-    equipo_2_jugador_1 = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="partidas_equipo2_jugador1")
-    equipo_2_jugador_2 = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="partidas_equipo2_jugador2")
-
-    triunfo_palo = models.CharField(
-        max_length=10,
-        choices=[('oros', 'Oros'), ('copas', 'Copas'), ('espadas', 'Espadas'), ('bastos', 'Bastos')]
-    )
-
-    # Winning team reference
-    equipo_ganador = models.IntegerField(
-        choices=[(1, "Equipo 1"), (2, "Equipo 2")], 
-        null=True, blank=True
-    )
-
-    mazo_restante = models.JSONField(default=list)
-    cartas_equipo_1_jugador_1 = models.JSONField(default=list)
-    cartas_equipo_1_jugador_2 = models.JSONField(default=list)
-    cartas_equipo_2_jugador_1 = models.JSONField(default=list)
-    cartas_equipo_2_jugador_2 = models.JSONField(default=list)
-    cartas_jugadas = models.JSONField(default=list)
-
-    puntos_equipo_1 = models.IntegerField(default=0)
-    puntos_equipo_2 = models.IntegerField(default=0)
-
-    turno_actual = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="turno_actual_2v2")
-
-    estado_partida = models.CharField(
-        max_length=15, 
-        choices=[('EN_JUEGO', 'En juego'), ('FINALIZADO', 'Finalizado')], 
-        default='EN_JUEGO'
-    )
-    
     def save(self, *args, **kwargs):
-        """
-        Override save method to create and associate a chat room when the match is saved.
-        """
-        # If this is a new match, create a chat room and add participants
-        if not self.chat:
-            # Create a new chat room for the match
+        """Sobreescribir <save> para crear chat cuando se cree nueva partida"""
+        if not self.pk and not self.chat:
             chat = Chat_partida.objects.create()
             self.chat = chat
-            
-            # After saving the match, add the players to the chat
-            self.chat.add_participant(self.equipo_1_jugador_1)
-            self.chat.add_participant(self.equipo_1_jugador_2)
-            self.chat.add_participant(self.equipo_2_jugador_1)
-            self.chat.add_participant(self.equipo_2_jugador_2)
-        
-        super(Partida2v2, self).save(*args, **kwargs)  # Save the match
+        super().save(*args, **kwargs)    
 
+    def delete(self, *args, **kwargs):
+        """Sobreescribir <delete> para borrar el chat cuando se termine/elimine la partida"""
+        if self.chat:
+            self.chat.delete()
+        super().delete(*args, **kwargs)
 
-        
-    def get_chat_id(self):
-        """
-        Override the method to return the chat ID for this specific match.
-        """
-        return self.chat.id if self.chat else None
-    
-    
+class JugadorPartida(models.Model):
+    """Modelo intermedio para relacionar un Usuario con una Partida"""
+    partida = models.ForeignKey(
+        Partida, on_delete=models.CASCADE, related_name='jugadores'
+    )
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.CASCADE, related_name='partidas'
+    )
+    equipo = models.IntegerField(
+        default=1, validators=[MinValueValidator(1), MaxValueValidator(2)]
+    )
+    cartas_json = models.JSONField(default=list, blank=True)
+    conectado = models.BooleanField(default=True)
+    channel_name = models.CharField(max_length=128, blank=True, null=True)
 
+    def __str__(self):
+        return f'Jugador {self.usuario.nombre} en partida {self.partida.id}'

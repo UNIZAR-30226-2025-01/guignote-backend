@@ -2,134 +2,89 @@ import json
 from django.contrib.auth.models import AnonymousUser
 from channels.generic.websocket import AsyncWebsocketConsumer
 from chat_partida.models import MensajePartida, Chat_partida as Chat
-from partidas.models import Partida, Partida2v2
 from usuarios.models import Usuario
 from asgiref.sync import sync_to_async
+from django.utils.timezone import now
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         """
         Called when the WebSocket is handshaking as part of the connection process.
         """
-        # Extract match_type and match_id from the URL path
-        
         self.usuario = self.scope.get('usuario', AnonymousUser())
-        path = self.scope['path']
-        path_parts = path.split('/')
+        self.chat_id = self.scope['url_route']['kwargs'].get('chat_id')
 
-        self.match_type = path_parts[3]  # '1v1' or '2v2'
-        self.match_id = path_parts[4]   # match_id
+        if not self.chat_id or isinstance(self.usuario, AnonymousUser):
+            await self.close(code=403)
+            return
 
-        self.room_group_name = f"chat_{self.match_type}_{self.match_id}"
+        # Cargar el chat
+        self.chat = await sync_to_async(self.get_chat)()
+        if not self.chat:
+            await self.send(text_data=json.dumps({'error': 'Chat no encontrado'}))
+            await self.close(code=404)
+            return
 
-        # Fetch the match instance based on match_type and match_id
-        match = await sync_to_async(self.get_match)(self.match_type, self.match_id)
+        ok = await sync_to_async(self.chat.add_participant)(self.usuario)
+        if not ok:
+            await self.send(text_data=json.dumps({'error': 'No puedes unirte a este chat'}))
+            await self.close(code=403)
+            return
 
-        if match:
-            # Get the chat associated with the match
-            self.chat = await sync_to_async(self.chat_id)(match)
-            # Ensure the user is part of the match (check chat participants)
-            if  await sync_to_async(self.is_user_in_match)(self.usuario, match):
-                # Add user to the WebSocket group
-                await self.channel_layer.group_add(self.room_group_name, self.channel_name)
-                await self.accept()
-            else:
-                # Reject connection if the user is not part of the match
-                await self.send(text_data=json.dumps({"error": "User not in match"}))
-                await self.close()
-        else:
-            # If match is not found
-            await self.send(text_data=json.dumps({"error": "Match not found"}))
-            await self.close()
+        self.room_group_name = f'chat_{self.chat_id}'
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
 
     async def disconnect(self, close_code):
         """Called when the WebSocket closes."""
         # Remove user from the WebSocket group
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        if hasattr(self, "room_group_name"):
+            await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+            await sync_to_async(self.chat.remove_participant)(self.usuario)
 
     async def receive(self, text_data):
         """
         Called when the WebSocket receives a message.
         """
-        data = json.loads(text_data)
-        message = data.get('message', '').strip()
-        user_id = data.get('user_id')
+        try:
+            data = json.loads(text_data)
+            contenido = data.get('contenido', '').strip()
 
-        if message and user_id:
-            user = await sync_to_async(self.get_user)(user_id)
-            if user:
-                # Save the message to the chat
-                await sync_to_async(self.save_message)(user, message)
-                # Send the message to the WebSocket group
-                await self.channel_layer.group_send(
-                    self.room_group_name,
-                    {
-                        "type": "chat_message",
-                        "message": message,
-                        "user": user.nombre,
-                    }
-                )
-    def chat_id(self, match):
-        return match.get_chat_id()
+            if not contenido:
+                await self.send(text_data=json.dumps({'error': 'El mensaje no puede estar vacío'}))
+                return
+
+            mensaje = await sync_to_async(MensajePartida.objects.create)(
+                chat=self.chat,
+                emisor=self.usuario,
+                contenido=contenido,
+                fecha_envio=now()
+            )
+
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'chat_message',
+                    'emisor': {
+                        'id': self.usuario.id,
+                        'nombre': self.usuario.nombre
+                    },
+                    'contenido': mensaje.contenido,
+                    'fecha_envio': mensaje.fecha_envio.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            )
+        
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({'error': 'Formato de mensaje inválido'}))
     
     async def chat_message(self, event):
         """
         Send the message to the WebSocket.
         """
-        message = event['message']
-        user = event['user']
+        await self.send(text_data=json.dumps(event))
 
-        # Send the message to the WebSocket client
-        await self.send(text_data=json.dumps({
-            'message': message,
-            'user': user,
-        }))
-
-    def get_match(self, match_type, match_id):
-        """Fetch the match instance based on match type ('1v1' or '2v2')."""
-        if match_type == '1v1':
-            return self.get_partida(match_id)
-        elif match_type == '2v2':
-            return self.get_partida2v2(match_id)
-        return None
-
-    def get_partida(self, match_id):
-        """Retrieve a 1v1 match (Partida)."""
+    def get_chat(self):
         try:
-            return Partida.objects.get(id=match_id)
-        except Partida.DoesNotExist:
-            return None
-
-    def get_partida2v2(self, match_id):
-        """Retrieve a 2v2 match (Partida2v2)."""
-        try:
-            return Partida2v2.objects.get(id=match_id)
-        except Partida2v2.DoesNotExist:
-            return None
-
-    def get_user(self, user_id):
-        """Retrieve the user instance by ID."""
-        try:
-            return Usuario.objects.get(id=user_id)
-        except Usuario.DoesNotExist:
-            return None
-
-    def is_user_in_match(self, user, match):
-        """Check if the user is part of the match by comparing user ID."""
-        if isinstance(match, Partida):  # 1v1 match
-            return user.id in [match.jugador_1.id, match.jugador_2.id]
-        elif isinstance(match, Partida2v2):  # 2v2 match
-            return user.id in [
-                match.equipo_1_jugador_1.id, match.equipo_1_jugador_2.id,
-                match.equipo_2_jugador_1.id, match.equipo_2_jugador_2.id
-            ]
-        return False
-
-    def save_message(self, user, message):
-        """Save the message to the associated chat."""
-        chat = Chat.objects.get(id=self.chat)
-        MensajePartida.objects.create(
-            emisor=user,
-            contenido=message,
-            chat=chat
-        )
+            return Chat.objects.get(id=self.chat_id)
+        except Chat.DoesNotExist:
+            return None 
