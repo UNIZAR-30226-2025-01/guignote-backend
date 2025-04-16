@@ -40,6 +40,9 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         import urllib.parse
         params = urllib.parse.parse_qs(query_params)
 
+        solo_amigos_str = params.get('solo_amigos', ['false'])[0]
+        solo_amigos = solo_amigos_str.lower() == 'true'
+
         id_partida_str = params.get('id_partida', [None])[0]
         if id_partida_str:
             self.partida = await self.obtener_partida_por_id(id_partida_str)
@@ -51,7 +54,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             if capacidad_str not in ['2', '4']:
                 await self.close()
                 return
-            self.partida: Partida = await self.obtener_o_crear_partida(int(capacidad_str))
+            self.partida: Partida = await self.obtener_o_crear_partida(int(capacidad_str), solo_amigos)
 
         if not self.partida:
             await self.close()
@@ -66,6 +69,11 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             self.room_group_name, self.channel_name)
         
         jugador, created = await self.agregar_jugador()
+
+        if not jugador:
+            await self.send_error('No puedes unirte a la partida')
+            await self.close()
+            return
 
         await self.accept()
 
@@ -670,15 +678,18 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         }))
 
     @database_sync_to_async
-    def obtener_o_crear_partida(self, capacidad: int):
+    def obtener_o_crear_partida(self, capacidad: int, solo_amigos: bool = False):
         """
         Obtiene una partida disponible (no llena) de capacidad
         dada. Si no existe, la crea.
         """
-        partida_disponible: Partida = Partida.objects.filter(
-            estado='esperando', capacidad=capacidad
-        ).first()
-        return partida_disponible or Partida.objects.create(capacidad=capacidad)
+        partidas_disponibles: Partida = Partida.objects.filter(
+            estado='esperando', capacidad=capacidad, solo_amigos=solo_amigos
+        )
+        for partida in partidas_disponibles:
+            if not solo_amigos or self.tiene_amigos_en_partida(partida, self.usuario):
+                return partida
+        return Partida.objects.create(capacidad=capacidad, solo_amigos=solo_amigos)
     
     @database_sync_to_async
     def obtener_partida_por_id(self, id_partida: str):
@@ -691,7 +702,13 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def agregar_jugador(self):
         """Agrega el usuario a la partida"""
-        count = JugadorPartida.objects.filter(partida=self.partida).count()
+        jugadores_existentes = JugadorPartida.objects.filter(partida=self.partida)
+
+        # Validar amisma si es una partida entre amigos
+        if self.partida.solo_amigos and not self.tiene_amigos_en_partida(self.partida, self.usuario):
+            return None, False
+
+        count = jugadores_existentes.count()
         equipo = (count % 2) + 1
 
         jugador, created = JugadorPartida.objects.get_or_create(
@@ -723,6 +740,16 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         """Devuelve el número de jugadores en la partida"""
         return JugadorPartida.objects.filter(partida=self.partida).count()
     
+    @database_sync_to_async
+    def tiene_amigos_en_partida(self, partida: Partida, usuario: Usuario) -> bool:
+        """
+        Verifica si el usuario tiene al menos un amigo en la partida dada.
+        También devuelve True si la partida está vacía (para permitir crearla).
+        """
+        jugadores_ids = JugadorPartida.objects.filter(partida=partida).values_list('usuario_id', flat=True)
+        amigos_ids = usuario.amigos.values_list('id', flat=True)
+        return any(j in amigos_ids for j in jugadores_ids) or not jugadores_ids
+
     @database_sync_to_async
     def get_jugador_by_id(self, jp_id):
         """Devuelve un jugado dado su id"""
