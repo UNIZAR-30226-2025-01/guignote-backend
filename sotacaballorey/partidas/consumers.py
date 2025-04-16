@@ -80,7 +80,9 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     'nombre': self.usuario.nombre,
                     'id': self.usuario.id
                 },
-                'chat_id': await self.obtener_chat_id()
+                'chat_id': await self.obtener_chat_id(),
+                'capacidad': self.capacidad,
+                'jugadores': await self.contar_jugadores()
             })
         else:
             # Si te reconectas envíamos más información para que frontend
@@ -115,7 +117,9 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             'usuario': {
                 'nombre': self.usuario.nombre,
                 'id': self.usuario.id
-            }
+            },
+            'capacidad': self.capacidad,
+            'jugadores': await self.contar_jugadores()
         })
 
         await self.channel_layer.group_discard(
@@ -592,8 +596,6 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         """
         Marca la partida como terminada
         """
-        self.partida.estado = 'terminada'
-        await self.db_sync_to_async_save(self.partida)
 
         e1 = self.partida.puntos_equipo_1
         e2 = self.partida.puntos_equipo_2
@@ -612,6 +614,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             'puntos_equipo_2': e2,
         })
 
+        await self.db_sync_to_async_delete(self.partida)
 
     #-----------------------------------------------------------------------------------#
     # Métodos auxiliares                                                                #
