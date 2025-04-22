@@ -1,4 +1,4 @@
-from .consumers import PartidaConsumer
+from partidas.game.consumers import PartidaConsumer
 from django.urls import path
 
 websocket_urlpatterns = [

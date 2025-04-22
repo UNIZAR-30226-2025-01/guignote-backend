@@ -13,6 +13,7 @@ urlpatterns = [
     path('eliminar_usuario/', views_usuarios.eliminar_usuario, name='eliminar_usuario'),
     path('obtener_amigos/', views_usuarios.obtener_amigos, name='obtener_amigos'),
     path('usuarios/id/<str:username>/', views_usuarios.obtener_id_por_nombre, name="obtener_id_por_nombre"),
+    path('imagen/', views_usuarios.establecer_imagen, name='establecer_imagen'),
     #######################################################################################################################################
     
 

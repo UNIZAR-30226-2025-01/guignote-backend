@@ -1,6 +1,6 @@
 
+from partidas.game.consumers import PartidaConsumer
 from channels.testing import WebsocketCommunicator
-from partidas.consumers import PartidaConsumer
 from django.test import TransactionTestCase
 from sotacaballorey.asgi import application
 from utils.jwt_auth import generar_token
