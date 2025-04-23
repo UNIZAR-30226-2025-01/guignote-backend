@@ -255,7 +255,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         mano = jugador.cartas_json
 
         # Filtrar las cartas que son válidas
-        cartas_validas = self.obtener_cartas_validas(estado_json, mano, jugador)
+        cartas_validas = await self.obtener_cartas_validas(estado_json, mano, jugador)
         carta_a_jugar = random.choice(cartas_validas) if cartas_validas else mano[0]
         await self.procesar_jugada(jugador, carta_a_jugar, automatica=True)
 
@@ -280,7 +280,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             return
         
         # ¿La carta cumple con las reglas del guiñote?
-        cartas_validas = self.obtener_cartas_validas(
+        cartas_validas = await self.obtener_cartas_validas(
             estado_json, jugador_que_juega.cartas_json, jugador_que_juega)
         if carta not in cartas_validas:
             await send_error(self.send, "Carta inválida para la fase actual")
@@ -322,6 +322,12 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             ganador_id, puntos = self.calcular_ganador(estado_json, baza_actual)
             estado_json['ultimo_ganador'] = ganador_id
             estado_json['baza_actual'] = []
+
+            # Las 10 últimas
+            jugadores = await get_jugadores(self.partida)
+            if not estado_json.get('baraja') and \
+                all(len(j.cartas_json) == 0 for j in jugadores):
+                    puntos += 10
 
             # Actualizar puntuación
             ganador = await get_jugador_by_id(ganador_id)
@@ -369,7 +375,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
             await self.iniciar_siguiente_turno()
 
-    def obtener_cartas_validas(self, estado_json, mano, jugador):
+    async def obtener_cartas_validas(self, estado_json, mano, jugador):
         """
         Determina qué cartas de la mano son válidas según el estado del
         juego o si se está en arrastre o no
@@ -383,19 +389,41 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         if not baza:
             return mano
         
-        # En arrastre se debe tirar una carta del mismo palo que la carta
-        # inicial de la baza, en su defecto una carta del palo de triunfo o
-        # en su defecto cualquier otra carta
-
         palo_inicial = baza[0]['carta']['palo']
         palo_triunfo = estado_json['triunfo']
+        jugador_id = jugador.id
+        equipo_ganador = jugador.equipo
 
+        # Función para ver si una carta gana
+        def gana(carta_a, carta_b):
+            return self.comparar_cartas({'carta': carta_a}, {'carta': carta_b}, palo_inicial, palo_triunfo)
+
+        # Si mi compañero de equipo va ganando la baza puedo tirar cualquier carta
+        if self.capacidad == 4:
+            mejor_id = self.calcular_ganador(estado_json, baza)[0]
+            mejor_jugador = await get_jugador_by_id(mejor_id)
+            if mejor_jugador and mejor_jugador.equipo == jugador.equipo and mejor_jugador.id != jugador.id:
+                return mano
+                    
+        # Cartas del mismo palo
         cartas_mismo_palo = [c for c in mano if c['palo'] == palo_inicial]
         if cartas_mismo_palo:
+            mismas_en_baza = [j['carta'] for j in baza if j['carta']['palo'] == palo_inicial]
+            if mismas_en_baza:
+                mejor_en_baza = max(mismas_en_baza, key=lambda c: self.fuerza_carta(c['valor']))
+                ganadoras = [c for c in cartas_mismo_palo if gana(c, mejor_en_baza)]
+                return ganadoras if ganadoras else cartas_mismo_palo
             return cartas_mismo_palo
-        
+
+        # No tiene del mismo palo. Buscar triunfos
         cartas_triunfo = [c for c in mano if c['palo'] == palo_triunfo]
         if cartas_triunfo:
+            triunfo_en_baza = [j['carta'] for j in baza if j['carta']['palo'] == palo_triunfo]
+            if triunfo_en_baza:
+                mejor_triunfo_en_baza = max(triunfo_en_baza, key=lambda c: self.fuerza_carta(c['valor']))
+                ganadoras = [c for c in cartas_triunfo if gana(c, mejor_triunfo_en_baza)]
+                if ganadoras:
+                    return ganadoras
             return cartas_triunfo
         
         return mano
