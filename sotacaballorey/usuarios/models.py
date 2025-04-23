@@ -1,7 +1,11 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from aspecto_carta.models import CardSkin
+from dorso_carta.models import CardBack
 
 class Usuario(models.Model):
+    unlocked_skins = models.ManyToManyField(CardSkin, related_name='players', blank=True)
+    unlocked_backs = models.ManyToManyField(CardBack, related_name='players', blank=True)
     nombre = models.CharField\
         (max_length=64,  blank=False, null=False, unique=True)
     correo = models.EmailField\

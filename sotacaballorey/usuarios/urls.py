@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import views_usuarios, views_solicitudes_amistad, views_estadisticas
+from .views import views_usuarios, views_solicitudes_amistad, views_estadisticas, views_aspectos
 
 urlpatterns = [
     # Hola, mundo (Prueba)
@@ -57,5 +57,12 @@ urlpatterns = [
     path('top_elo_parejas_amigos/', views_estadisticas.obtener_top_elo_parejas_amigos, name="obtener_top_elo_parejas_amigos"),
     
     #######################################################################################################################################
+    
+    #######################################################################################################################################
+    # Relacionadas con aspectos
+    path('unlock_skin/<int:user_id>/', views_aspectos.unlock_skin, name='unlock_skin'),
+    path('unlock_back/<int:user_id>/', views_aspectos.unlock_back, name='unlock_back'),
+    path('get_unlocked_items/<int:user_id>/', views_aspectos.get_unlocked_items, name='get_unlocked_items'),
+    
+    #######################################################################################################################################
 ]
- 
