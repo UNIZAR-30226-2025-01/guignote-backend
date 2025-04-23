@@ -63,3 +63,22 @@ def get_all_card_backs(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+# Get CardBack ID from Name
+def get_card_back_id_from_name(request):
+    """
+    Retrieves the ID of a CardBack based on its name.
+    Expects a query parameter 'name' (the name of the CardBack).
+    """
+    name = request.GET.get('name')
+    
+    if not name:
+        return JsonResponse({"error": "Name parameter is required"}, status=400)
+
+    try:
+        # Fetch the CardBack by name
+        card_back = CardBack.objects.get(name=name)
+        return JsonResponse({"id": card_back.id, "name": card_back.name}, status=200)
+    
+    except CardBack.DoesNotExist:
+        return JsonResponse({"error": "CardBack not found"}, status=404)

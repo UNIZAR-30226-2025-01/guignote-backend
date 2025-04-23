@@ -60,3 +60,21 @@ def get_all_card_skins(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+def get_card_skin_id_from_name(request):
+    """
+    Retrieves the ID of a CardSkin based on its name.
+    Expects a query parameter 'name' (the name of the CardSkin).
+    """
+    name = request.GET.get('name')
+    
+    if not name:
+        return JsonResponse({"error": "Name parameter is required"}, status=400)
+
+    try:
+        # Fetch the CardSkin by name
+        card_skin = CardSkin.objects.get(name=name)
+        return JsonResponse({"id": card_skin.id, "name": card_skin.name}, status=200)
+    
+    except CardSkin.DoesNotExist:
+        return JsonResponse({"error": "CardSkin not found"}, status=404)

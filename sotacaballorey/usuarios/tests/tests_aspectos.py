@@ -25,6 +25,9 @@ class CardSkinBackTestCase(TestCase):
         self.unlock_skin_url = reverse('unlock_skin', kwargs={'user_id': self.user.id})
         self.unlock_back_url = reverse('unlock_back', kwargs={'user_id': self.user.id})
         self.get_unlocked_items_url = reverse('get_unlocked_items', kwargs={'user_id': self.user.id})
+        
+        self.get_card_skin_id_url = reverse('get_card_skin_id_from_name')  # The view to get CardSkin by name
+        self.get_card_back_id_url = reverse('get_card_back_id_from_name')  # The view to get CardBack by name
     
     def test_add_and_unlock_card_skins_and_back(self):
         # Test adding and retrieving all card skins
@@ -78,6 +81,38 @@ class CardSkinBackTestCase(TestCase):
         self.assertEqual(len(unlocked_backs), 2)
         self.assertIn(self.back1.name, [back['name'] for back in unlocked_backs])
         self.assertIn(self.back2.name, [back['name'] for back in unlocked_backs])
+        
+    def test_get_card_skin_id_from_name(self):
+            # Test retrieving CardSkin ID by name
+            response = self.client.get(self.get_card_skin_id_url, {'name': 'Flame Design'})
+            self.assertEqual(response.status_code, 200)
+            
+            # Check if the response contains the correct ID and name
+            response_data = json.loads(response.content)
+            self.assertEqual(response_data['id'], self.skin1.id)
+            self.assertEqual(response_data['name'], 'Flame Design')
+
+            # Test for a non-existing CardSkin
+            response = self.client.get(self.get_card_skin_id_url, {'name': 'NonExistent Skin'})
+            self.assertEqual(response.status_code, 404)
+            response_data = json.loads(response.content)
+            self.assertEqual(response_data['error'], "CardSkin not found")
+
+    def test_get_card_back_id_from_name(self):
+        # Test retrieving CardBack ID by name
+        response = self.client.get(self.get_card_back_id_url, {'name': 'Fire Back'})
+        self.assertEqual(response.status_code, 200)
+        
+        # Check if the response contains the correct ID and name
+        response_data = json.loads(response.content)
+        self.assertEqual(response_data['id'], self.back1.id)
+        self.assertEqual(response_data['name'], 'Fire Back')
+
+        # Test for a non-existing CardBack
+        response = self.client.get(self.get_card_back_id_url, {'name': 'NonExistent Back'})
+        self.assertEqual(response.status_code, 404)
+        response_data = json.loads(response.content)
+        self.assertEqual(response_data['error'], "CardBack not found")
 
     def tearDown(self):
         # Clean up any data after each test
