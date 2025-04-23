@@ -16,6 +16,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     """
 
     TIEMPO_TURNO = 60 # en segundos
+    timer_task = None
 
     async def connect(self):
         self.usuario: Usuario = self.scope.get('usuario', None)
@@ -83,7 +84,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         else:
             # Si te reconectas envíamos más información para que frontend
             # pueda reconstruir estado partida
-            await send_estado_jugadores(self, MessageTypes.PLAYER_JOINED)
+            await send_estado_jugadores(self, MessageTypes.START_GAME, solo_jugador=jugador)
 
         # Comprobar si se inicia la partida
         await self.comprobar_inicio_partida()
@@ -173,7 +174,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         baraja = self.crear_baraja()
         random.shuffle(baraja)
         
-        carta_triunfo = baraja.pop()
+        carta_triunfo = baraja[0]
         palo_triunfo: str = carta_triunfo['palo']
 
         # Repartir cartas
@@ -189,16 +190,15 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await db_sync_to_async_save(jugador)
 
         # Guardar info en estado_json
-        estado_json = {
+        self.partida.estado_json = {
             'baraja': baraja,                   # Cartas restantes
             'triunfo': palo_triunfo,            # Triunfo
             'carta_triunfo': carta_triunfo,     # Carta triunfo
             'fase_arrastre': False,             # Fase arrastre?
-            'turno_indice': 0,                  # Índice de jugador que empieza
             'baza_actual': [],                  # Cartas jugadas en la baza actual
-            'ultimo_ganador': None              # Quién ganó la última baza
+            'ultimo_ganador': None,             # Quién ganó la última baza
+            'turno_actual_id': jugadores[0].id  # Primer jugador en orden por ID
         }
-        self.partida.estado_json = estado_json
         await db_sync_to_async_save(self.partida)
 
     def crear_baraja(self):
@@ -213,36 +213,24 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
     async def iniciar_siguiente_turno(self):
         """Lógica para gestionar el turno del siguiente jugador"""
-        estado_json = self.partida.estado_json
-        turno_indice: int = estado_json['turno_indice']
+        turno_id = self.partida.estado_json['turno_actual_id']
+        jugador_turno: JugadorPartida = await get_jugador_by_id(turno_id)
 
-        # Si en ultimo_ganador hay algo, ese jugador inicia la siguiente baza
-        if estado_json.get('ultimo_ganador') is not None:
-            ultimo_ganador_id = estado_json['ultimo_ganador']
-            turno_indice = await index_de_jugador(self.partida, ultimo_ganador_id)
-            estado_json['turno_indice'] = turno_indice
-            self.partida.estado_json = estado_json
-            await db_sync_to_async_save(self.partida)
-
-        jugadores = await get_jugadores(self.partida)
-        orden_jugadores = sorted(jugadores, key=lambda x: x.id)
-        if turno_indice >= len(orden_jugadores):
-            turno_indice = 0
-        jugador_turno: JugadorPartida = orden_jugadores[turno_indice]
-
-        usuario = await sync_to_async(lambda: jugador_turno.usuario)()
+        usuario: Usuario = await sync_to_async(lambda: jugador_turno.usuario)()
         await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.TURN_UPDATE, {
             'message': f'Es el turno de {usuario.nombre}.',
             'jugador': {
                 'nombre': usuario.nombre,
                 'id': usuario.id
-            },
-            'turno_index': turno_indice
+            }
         })
 
-        asyncio.create_task(self.temporizador_turno(jugador_turno, turno_indice))
- 
-    async def temporizador_turno(self, jugador_turno: JugadorPartida, turno_indice: int):
+        if self.timer_task and not self.timer_task.done():
+            self.timer_task.cancel()
+
+        self.timer_task = asyncio.create_task(self.temporizador_turno(jugador_turno))
+
+    async def temporizador_turno(self, jugador_turno: JugadorPartida):
         """
         Espera hasta que el jugador juegue (o acabe el tiempo de turno)
         Si expira el tiempo, juega carta válida aleatoria
@@ -251,10 +239,8 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         while(datetime.now() - inicio).total_seconds() < self.TIEMPO_TURNO:
             await asyncio.sleep(1)
             self.partida = await refresh(self.partida)
-            current_turno_index = self.partida.estado_json.get('turno_indice', 0)
-            if current_turno_index != turno_indice:
-                # Significa que el turno avanzó, así que ya jugó.
-                return 
+            if self.partida.estado_json['turno_actual_id'] != jugador_turno.id:
+                return
         await self.jugar_carta_automatica(jugador_turno)
 
     async def jugar_carta_automatica(self, jugador: JugadorPartida):
@@ -262,6 +248,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         Si el tiempo del turno del jugador expirá, forzamos jugada válida
         aleatoria
         """
+        self.partida = await refresh(self.partida)
         estado_json = self.partida.estado_json
 
         jugador: JugadorPartida = await refresh(jugador)
@@ -269,33 +256,26 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
         # Filtrar las cartas que son válidas
         cartas_validas = self.obtener_cartas_validas(estado_json, mano, jugador)
-        if not cartas_validas:
-            carta_a_jugar = mano[0]
-        else:
-            carta_a_jugar = random.choice(cartas_validas)
-        
+        carta_a_jugar = random.choice(cartas_validas) if cartas_validas else mano[0]
         await self.procesar_jugada(jugador, carta_a_jugar, automatica=True)
 
     async def jugar_carta(self, carta):
         """LLamado cuando el jugador envía una carta manualmente"""
         estado_json = self.partida.estado_json
-        turno_indice = estado_json['turno_indice']
+        turno_actual_id = estado_json.get('turno_actual_id')
 
-        jugadores = await get_jugadores(self.partida)
-        orden_jugadores = sorted(jugadores, key=lambda x: x.id)
-        if turno_indice >= len(orden_jugadores):
-            turno_indice = 0
-
-        jugador_turno: JugadorPartida = orden_jugadores[turno_indice]
-        jugador_que_juega = await get_jugador(self.partida, self.usuario)
+        jugador_que_juega: JugadorPartida = await get_jugador(self.partida, self.usuario)
 
         # ¿Es tu turno?
-        if jugador_turno.id != jugador_que_juega.id:
+        if turno_actual_id != jugador_que_juega.id:
             await send_error(self.send, "No es tu turno")
             return
         
         # ¿Tienes la carta?
-        if carta not in jugador_que_juega.cartas_json:
+        def cartas_son_iguales(c1, c2):
+            return c1.get('palo') == c2.get('palo') and int(c1.get('valor')) == int(c2.get('valor'))
+
+        if not any(cartas_son_iguales(carta, c) for c in jugador_que_juega.cartas_json):
             await send_error(self.send, "No tiene esa carta en tu mano")
             return
         
@@ -327,7 +307,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         })
 
         # Añadir carta a baza actual
-        estado_json= self.partida.estado_json
+        estado_json = self.partida.estado_json
         baza_actual = estado_json.get('baza_actual', [])
         baza_actual.append({
             'jugador_id': jugador.id,
@@ -337,19 +317,21 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         self.partida.estado_json = estado_json
         await db_sync_to_async_save(self.partida)
 
-        # Ver si todos los jugadores han jugado carta en la baza
         if len(baza_actual) == self.capacidad:
-            # Calcular ganador de la baza y actualizar puntos
-            ganador_id, puntos_baza = self.calcular_ganador(estado_json, baza_actual)
+            # Fin de la baza: Calcular ganador de la baza
+            ganador_id, puntos = self.calcular_ganador(estado_json, baza_actual)
             estado_json['ultimo_ganador'] = ganador_id
+            estado_json['baza_actual'] = []
+
+            # Actualizar puntuación
             ganador = await get_jugador_by_id(ganador_id)
             if ganador.equipo == 1:
-                self.partida.puntos_equipo_1 += puntos_baza
+                self.partida.puntos_equipo_1 += puntos
             else:
-                self.partida.puntos_equipo_2 += puntos_baza
+                self.partida.puntos_equipo_2 += puntos
 
-            # Vaciar la baza actual
-            estado_json['baza_actual'] = []
+            # En la siguiente baza empezará el ganador
+            estado_json['turno_actual_id'] = ganador_id
             self.partida.estado_json = estado_json
             await db_sync_to_async_save(self.partida)
 
@@ -360,29 +342,31 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     'id': usuario_ganador.id,
                     'equipo': ganador.equipo
                 },
-                'puntos_baza': puntos_baza,
+                'puntos_baza': puntos,
                 'puntos_equipo_1': self.partida.puntos_equipo_1,
                 'puntos_equipo_2': self.partida.puntos_equipo_2
             })
 
-            # Robar carta si no estamos en fase de arrastre
+            # Al final de la baza, todos roban una carta
             await self.robar_cartas()
 
-            # Comprobar si estamos en fase de arrastre o fin de partida
+            # Verificar arrastre o fin de partida
             await self.verificar_fase_arrastre()
             if await self.comprobar_fin_partida():
                 return
-            
-            estado_json['turno_indice'] = await index_de_jugador(self.partida, ganador_id)
+
+            await self.iniciar_siguiente_turno()
+        else:
+            # Pasar turno al siguiente jugador
+            jugadores = await get_jugadores(self.partida)
+            orden = sorted(jugadores, key=lambda x: x.id)
+            ids = [j.id for j in orden]
+            actual_idx = ids.index(jugador.id)
+            siguiente_id = ids[(actual_idx + 1) % self.capacidad]
+            estado_json['turno_actual_id'] = siguiente_id
             self.partida.estado_json = estado_json
             await db_sync_to_async_save(self.partida)
 
-            # Siguiente turno
-            await self.iniciar_siguiente_turno()
-        else:
-            estado_json['turno_indice'] = (estado_json['turno_indice'] + 1) % self.capacidad
-            self.partida.estado_json = estado_json
-            await db_sync_to_async_save(self.partida)
             await self.iniciar_siguiente_turno()
 
     def obtener_cartas_validas(self, estado_json, mano, jugador):
@@ -437,59 +421,39 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         return (mejor_jugada['jugador_id'], puntos_totales)
     
     def comparar_cartas(self, jugada_actual, jugada_nueva, palo_inicial, palo_triunfo):
-        """Compara las cartas de dos jugadas y devuelve la ganadora"""
+        """Compara dos jugadas y devuelve la ganadora según las reglas del guiñote"""
         c_ganadora = jugada_actual['carta']
         c_nueva = jugada_nueva['carta']
 
-        es_triunfo_nueva = (c_nueva['palo'] == palo_triunfo)
-        es_triunfo_ganadora = (c_ganadora['palo'] == palo_triunfo)
-        if es_triunfo_ganadora and not es_triunfo_nueva:
+        # Prioridad palo de triunfo
+        if c_ganadora['palo'] == palo_triunfo and c_nueva['palo'] != palo_triunfo:
             return jugada_actual
-        
-        if es_triunfo_nueva and not es_triunfo_ganadora:
+        elif c_nueva['palo'] == palo_triunfo:
             return jugada_nueva
         
-        if es_triunfo_ganadora and es_triunfo_nueva:
-            if self.valor_carta(c_nueva) > self.valor_carta(c_ganadora) or \
-                (self.valor_carta(c_nueva) == self.valor_carta(c_ganadora) and 
-                 c_nueva['valor'] > c_ganadora['valor']):
-                return jugada_nueva
-            else:
-                return jugada_actual
-            
-        mismo_palo_ganadora = (c_ganadora["palo"] == palo_inicial)
-        mismo_palo_nueva = (c_nueva["palo"] == palo_inicial)
+        # Prioridad palo inicial de la baza
+        if c_ganadora['palo'] == palo_inicial and c_nueva['palo'] != palo_inicial:
+            return jugada_actual
+        elif c_nueva['palo'] == palo_inicial:
+            return jugada_nueva
+        
+        # Comparación entre cartas del mismo palo
+        fuerza_ganadora = self.fuerza_carta(c_ganadora['valor'])
+        fuerza_nueva = self.fuerza_carta(c_nueva['valor'])
+        return jugada_nueva if fuerza_nueva < fuerza_ganadora else jugada_actual
+        
+    def puntos_carta(self, valor: int) -> int:
+        """Puntos que aporta una carta según su valor."""
+        return {1: 11, 3: 10, 12: 4, 10: 3, 11: 2}.get(valor, 0)
 
-        if mismo_palo_ganadora and not mismo_palo_nueva:
-            return jugada_actual
-        
-        if mismo_palo_nueva and not mismo_palo_ganadora:
-            return jugada_nueva
-        
-        if mismo_palo_ganadora and mismo_palo_nueva:
-            if self.valor_carta(c_nueva) > self.valor_carta(c_ganadora) or \
-                (self.valor_carta(c_nueva) == self.valor_carta(c_ganadora) and 
-                 c_nueva['valor'] > c_ganadora['valor']):
-                return jugada_nueva
-            else:
-                return jugada_actual
-            
-        return jugada_actual
-        
+    def fuerza_carta(self, valor: int) -> int:
+        """Fuerza relativa de una carta para decidir quién gana la baza."""
+        orden = [1, 3, 12, 10, 11, 7, 6, 5, 4, 2]
+        return orden.index(valor) if valor in orden else len(orden)
+
     def valor_carta(self, carta) -> int:
-        """Puntos que aporta cada carta"""
-        valor = carta['valor']
-        if valor == 1:
-            return 11
-        if valor == 3:
-            return 10
-        if valor == 12:
-            return 4
-        if valor == 11:
-            return 3
-        if valor == 10:
-            return 2
-        return 0
+        """Devuelve el valor de la carta"""
+        return self.puntos_carta(carta['valor'])
 
     #-----------------------------------------------------------------------------------#
     # Robar cartas y fase de arrastre                                                   #
@@ -533,15 +497,36 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await db_sync_to_async_save(self.partida)
 
     async def verificar_fase_arrastre(self):
-        """Activa fase de arrastre si no quedan cartas en el mazo central"""
+        """Activa fase de arrastre si no quedan cartas en el mazo central y asigna la carta de triunfo al perdedor"""
         estado_json = self.partida.estado_json
-        if not estado_json.get("baraja"):
-            estado_json["fase_arrastre"] = True
+        baraja = estado_json.get('baraja', [])
+
+        if len(baraja) == 1:
+            baraja.pop()
+            estado_json['baraja'] = baraja
+            # Asignar la carta de triunfo al equipo que perdió la última baza antes de arrastre
+            carta_triunfo = estado_json.get('carta_triunfo')
+            if carta_triunfo:
+                ultimo_ganador_id = estado_json.get('ultimo_ganador')
+                jugadores = await get_jugadores(self.partida)
+                ganador = next((j for j in jugadores if j.id == ultimo_ganador_id), None)
+                if ganador:
+                    equipo_perdedor = 2 if ganador.equipo == 1 else 1
+                    puntos = self.valor_carta(carta_triunfo)
+                    if equipo_perdedor == 1:
+                        self.partida.puntos_equipo_1 += puntos
+                    else:
+                        self.partida.puntos_equipo_2 += puntos
+                    await db_sync_to_async_save(self.partida)
+
+            estado_json['fase_arrastre'] = True
             self.partida.estado_json = estado_json
             await db_sync_to_async_save(self.partida)
 
             await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PHASE_UPDATE, data={
-                'message': 'La partida entra en fase de arrastre.'
+                'message': 'La partida entra en fase de arrastre.',
+                'carta_triunfo': carta_triunfo,
+                'equipo_que_gana_triunfo': equipo_perdedor
             })
 
     #-----------------------------------------------------------------------------------#

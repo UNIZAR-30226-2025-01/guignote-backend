@@ -104,14 +104,14 @@ def refresh(instance):
     instance.refresh_from_db()
     return instance
 
-async def index_de_jugador(partida: Partida, jp_id):
+async def index_de_jugador(partida: Partida, jugador_id: int) -> int:
     """
     Retorna el índice de un jugador en la lista ordenada de jugadores, para
     sincronizar con turno_index.
     """
     jugadores = await get_jugadores(partida)
-    orden = sorted(jugadores, key=lambda x: x.id)
-    for i, jug in enumerate(orden):
-        if jug.id == jp_id:
-            return i
+    jugadores_ordenados = sorted(jugadores, key=lambda x: x.id)
+    for idx, jugador in enumerate(jugadores_ordenados):
+        if jugador.id == jugador_id:
+            return idx
     return 0

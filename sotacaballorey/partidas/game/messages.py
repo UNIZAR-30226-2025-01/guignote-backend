@@ -36,12 +36,12 @@ async def send_to_group(channel_layer, room_group_name, msg_type: str, data):
         }
     )
 
-async def send_estado_jugadores(self, msg_type: str):
+async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartida = None):
     estado_json = self.partida.estado_json
     mazo = estado_json.get('baraja', [])
     fase_arrastre = estado_json.get('fase_arrastre', False)
     carta_triunfo = estado_json.get('carta_triunfo')
-    jugadores = await get_jugadores(self.partida)
+    jugadores = [solo_jugador] if solo_jugador else await get_jugadores(self.partida)
 
     players_info = []
     for jp in jugadores:
@@ -53,6 +53,8 @@ async def send_estado_jugadores(self, msg_type: str):
             'num_cartas': len(jp.cartas_json)
         })
 
+    chat_id = await obtener_chat_id(self.partida)
+
     for jp in jugadores:
         data_para_jugador = {
             'jugadores': players_info,
@@ -60,7 +62,7 @@ async def send_estado_jugadores(self, msg_type: str):
             'fase_arrastre': fase_arrastre,
             'mis_cartas': jp.cartas_json,
             'carta_triunfo': carta_triunfo,
-            'chat_id': await obtener_chat_id(self.partida)
+            'chat_id': chat_id
         }
         if jp.channel_name:
             await self.channel_layer.send(jp.channel_name, {
