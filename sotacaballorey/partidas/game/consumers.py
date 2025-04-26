@@ -141,6 +141,8 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await self.jugar_carta(carta)
         elif accion == 'cantar':
             await self.procesar_canto()
+        elif accion == 'cambiar_siete':
+            await self.procesar_cambio_siete()
 
     #-----------------------------------------------------------------------------------#
     # Lógica de inicio de partida                                                       #
@@ -751,3 +753,60 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     cantos.append({'tipo': '20', 'palo': palo})
         
         return cantos
+    
+    #-----------------------------------------------------------------------------------#
+    # Cambio del 7                                                                      #
+    #-----------------------------------------------------------------------------------#
+
+    async def procesar_cambio_siete(self):
+        """Procesar la acción de cambiar el 7 de triunfo"""
+        estado_json = self.partida.estado_json
+        jugador: JugadorPartida = await get_jugador(self.partida, self.usuario)
+
+        # Validacion
+        if not await self.puede_cambiar_siete(jugador):
+            await send_error(self.send, 'No puedes cambiar el 7 ahora')
+            return
+        
+        palo_triunfo = estado_json['triunfo']
+        siete_triunfo = {'palo': palo_triunfo, 'valor': 7}
+
+        # Comprobar que tiene el 7 de triunfo
+        if siete_triunfo not in jugador.cartas_json:
+            await send_error(self.send, 'No tienes el 7 de triunfo')
+            return
+
+        # Intercambio
+        carta_triunfo_actual = estado_json['carta_triunfo']
+        jugador.cartas_json.remove(siete_triunfo)  
+        jugador.cartas_json.append(carta_triunfo_actual)
+        estado_json['carta_triunfo'] = siete_triunfo
+        estado_json['baraja'][0] = siete_triunfo
+        await db_sync_to_async_save(jugador)
+        await db_sync_to_async_save(self.partida)
+
+        await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.CAMBIO_SIETE, {
+            'jugador': {
+                'id': jugador.usuario.id,
+                'nombre': jugador.usuario.nombre,
+                'equipo': jugador.equipo
+            },
+            'carta_robada': carta_triunfo_actual
+        })
+
+    async def puede_cambiar_siete(self, jugador: JugadorPartida) -> bool:
+        """Determina si el jugador puede cambiar el 7"""
+        estado_json = self.partida.estado_json
+        
+        # Solo puede cambiar si:
+        # 1. Su equipo ganó la última baza
+        # 2. No se ha tirado ninguna carta en la baza actual
+        # 3. No estamos en fase de arrastre
+        ultimo_ganador = await get_jugador_by_id(estado_json.get('ultimo_ganador'))
+        
+        return (
+            not estado_json.get('fase_arrastre', False) and
+            ultimo_ganador and
+            ultimo_ganador.equipo == jugador.equipo and
+            len(estado_json.get('baza_actual', [])) == 0
+        )

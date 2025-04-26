@@ -14,6 +14,7 @@ class MessageTypes:
     CARD_DRAWN = 'card_drawn'
     ERROR = "error",
     CANTO = "canto",
+    CAMBIO_SIETE = "cambio_siete"
 
 #-----------------------------------------------------------------------------------#
 # Métodos para enviar mensajes al front-end                                         #
