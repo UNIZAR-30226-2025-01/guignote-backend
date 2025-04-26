@@ -29,6 +29,7 @@ class Partida(models.Model):
     estado_json = models.JSONField(default=dict, blank=True)
     solo_amigos = models.BooleanField(default=False)
     es_revueltas = models.BooleanField(default=False)
+    cantos_realizados = models.JSONField(default=dict)
 
     def __str__(self):
         return f'Partida {self.id} - {self.capacidad} jugadores ({self.estado})'

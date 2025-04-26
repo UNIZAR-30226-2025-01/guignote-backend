@@ -12,7 +12,8 @@ class MessageTypes:
     ROUND_RESULT = 'round_result'
     PHASE_UPDATE = 'phase_update'
     CARD_DRAWN = 'card_drawn'
-    ERROR = "error"
+    ERROR = "error",
+    CANTO = "canto",
 
 #-----------------------------------------------------------------------------------#
 # Métodos para enviar mensajes al front-end                                         #

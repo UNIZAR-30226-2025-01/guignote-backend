@@ -16,6 +16,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     """
 
     TIEMPO_TURNO = 60 # en segundos
+    palos = ['Oros', 'Copas', 'Espadas', 'Bastos']
     timer_task = None
 
     async def connect(self):
@@ -138,6 +139,8 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         if accion == 'jugar_carta':
             carta: dict = data.get('carta')
             await self.jugar_carta(carta)
+        elif accion == 'cantar':
+            await self.procesar_canto()
 
     #-----------------------------------------------------------------------------------#
     # Lógica de inicio de partida                                                       #
@@ -203,9 +206,8 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
     def crear_baraja(self):
         """Crea baraja española de 40 cartas"""
-        palos = ['Oros', 'Copas', 'Espadas', 'Bastos']
         valores = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12]
-        return [{'palo': p, 'valor': v} for p in palos for v in valores]
+        return [{'palo': p, 'valor': v} for p in self.palos for v in valores]
             
     #-----------------------------------------------------------------------------------#
     # Lógica de turnos                                                                  #
@@ -625,6 +627,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         ultimo_ganador_id = self.partida.estado_json.get('ultimo_ganador')
 
         self.partida.es_revueltas = True
+        self.partida.cantos_realizados = {}
         await db_sync_to_async_save(self.partida)
         await self.iniciar_partida()
 
@@ -654,3 +657,97 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             "type": msg_type,
             "data": data
         }))
+
+    #-----------------------------------------------------------------------------------#
+    # Lógica de cantos                                                                  #
+    #-----------------------------------------------------------------------------------#
+    
+    async def procesar_canto(self):
+        """Procesa la acción de cantar de un jugador"""
+        estado_json = self.partida.estado_json
+        jugador: JugadorPartida = await get_jugador(self.partida, self.usuario)
+
+        # Validar que puede cantar
+        if not await self.puede_cantar(jugador):
+            await send_error(self.send, "No puedes cantar ahora")
+            return
+        
+        # Buscar cantos posibles
+        cantos = await self.detectar_cantos(jugador)
+        if not cantos:
+            await send_error(self.send, "No tienes cartas para cantar")
+            return
+        
+        # Aplicar cantos y sumar puntos
+        puntos = 0
+        canto_messages = []
+
+        for canto in cantos:
+            if canto['tipo'] == '20':
+                if canto['palo'] not in self.partida.cantos_realizados.get('20', []):
+                    if '20' not in self.partida.cantos_realizados:
+                        self.partida.cantos_realizados['20'] = []
+                    self.partida.cantos_realizados['20'].append(canto['palo'])
+                    puntos += 20
+                    canto_messages.append(f"20 ({canto['palo']})")
+            elif canto['tipo'] == '40':
+                if not self.partida.cantos_realizados.get('40', False):
+                    self.partida.cantos_realizados['40'] = True
+                    puntos += 40
+                    canto_messages.append("40 (triunfo)")
+
+        if puntos == 0:
+            await send_error(self.send, "No hay cantos válidos disponibles")
+            return
+        
+        # Sumar puntos al equipo
+        if jugador.equipo == 1:
+            self.partida.puntos_equipo_1 += puntos
+        else:
+            self.partida.puntos_equipo_2 += puntos
+        await db_sync_to_async_save(self.partida)
+
+        await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.CANTO, {
+            'jugador': {
+                'id': jugador.usuario.id,
+                'nombre': jugador.usuario.nombre,
+                'equipo': jugador.equipo
+            },
+            'cantos': canto_messages,
+            'puntos': puntos,
+            'puntos_equipo_1': self.partida.puntos_equipo_1,
+            'puntos_equipo_2': self.partida.puntos_equipo_2
+        })
+
+    async def puede_cantar(self, jugador: JugadorPartida) -> bool:
+        """Determina si el jugador puede cantar"""
+        estado_json = self.partida.estado_json
+        
+        # Solo puede cantar si:
+        # 1. Su equipo ganó la última baza
+        # 2. No se ha tirado ninguna carta en la baza actual
+        ultimo_ganador = await get_jugador_by_id(estado_json.get('ultimo_ganador'))
+        
+        return (
+            ultimo_ganador and
+            ultimo_ganador.equipo == jugador.equipo and
+            len(estado_json.get('baza_actual', [])) == 0
+        )    
+
+    async def detectar_cantos(self, jugador: JugadorPartida) -> list:
+        """Detecta qué cantos puede hacer el jugador"""
+        cartas = jugador.cartas_json
+        palo_triunfo = self.partida.estado_json['triunfo']
+        cantos = []
+
+        for palo in self.palos:
+            tiene_rey = any(c['palo'] == palo and c['valor'] == 12 for c in cartas)
+            tiene_sota = any(c['palo'] == palo and c['valor'] == 10 for c in cartas)
+            
+            if tiene_rey and tiene_sota:
+                if palo == palo_triunfo:
+                    cantos.append({'tipo': '40', 'palo': palo})
+                else:
+                    cantos.append({'tipo': '20', 'palo': palo})
+        
+        return cantos
