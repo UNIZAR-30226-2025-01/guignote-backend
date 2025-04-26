@@ -562,37 +562,52 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     #-----------------------------------------------------------------------------------#
     async def comprobar_fin_partida(self):
         """
-        Verifica si un equipo supero los 100 puntos, o si no quedan
-        cartas en el mazo central ni en las manos de los jugadores
+        Verifica las condiciones de fin de partida:
+        - Si estamos en revueltas, termina cuando un equipo supera los 100 puntos.
+        - Si estamos en partida normal, termina solo cuando se vacían las manos y el mazo,
+          y un équipo ha superado los 100 puntos.
         """
-        if self.partida.puntos_equipo_1 >= 100 or self.partida.puntos_equipo_2 >= 100:
-            await self.finalizar_partida()
-            return True
-        
+        self.partida = await refresh(self.partida)
         estado_json = self.partida.estado_json
-        if not estado_json.get("baraja"):
-            jugadores = await get_jugadores(self.partida)
-            manos_vacias = all(len(jp.cartas_json) == 0 for jp in jugadores)
-            if manos_vacias:
+
+        if self.partida.es_revueltas:
+            if self.partida.puntos_equipo_1 > 100 or self.partida.puntos_equipo_2 > 100:
                 await self.finalizar_partida()
                 return True
-            
-        return False
+            return False
+        
+        else:
+            if not estado_json.get('baraja'):
+                jugadores = await get_jugadores(self.partida)
+                manos_vacias = all(len(jp.cartas_json) == 0 for jp in jugadores)
+                if manos_vacias:
+                    await self.finalizar_partida()
+                    return True
+            return False
     
     async def finalizar_partida(self):
         """
-        Marca la partida como terminada
+        Decide el equipo ganador según reglas:
+        - En partida normal, si ambos superan 100, gana quien hizo las 10 últimas.
+        - En revueltas, gana quien supera primero los 100.
         """
-
         e1 = self.partida.puntos_equipo_1
         e2 = self.partida.puntos_equipo_2
 
-        if e1 > e2:
+        if e1 > 100 and e2 > 100 and not self.partida.es_revueltas:
+            # Ambos equipos superan 100
+            # El que hizo las 10 últimas gana
+            ultimo_ganador_id = self.partida.estado_json.get('ultimo_ganador')
+            ganador = (await get_jugador_by_id(ultimo_ganador_id)).equipo if ultimo_ganador_id else 0
+        elif e1 > 100:
+            # Si un equipo supera 100, gana ese equipo
             ganador = 1
-        elif e2 > e1:
+        elif e2 > 100:
+            # Si un equipo supera 100, gana ese equipo
             ganador = 2
         else:
-            ganador = 0
+            await self.iniciar_revueltas()
+            return
 
         await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.GAME_OVER, {
             'message': "Fin de la partida.",
@@ -602,6 +617,23 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         })
 
         await db_sync_to_async_delete(self.partida)
+
+    async def iniciar_revueltas(self):
+        """Inicia la partida de revueltas"""
+        # Guardamos el ganador de la baza final, que será quien tenga el primer turno
+        # en revueltas
+        ultimo_ganador_id = self.partida.estado_json.get('ultimo_ganador')
+
+        self.partida.es_revueltas = True
+        await db_sync_to_async_save(self.partida)
+        await self.iniciar_partida()
+
+        # Restauramos último ganador
+        self.partida.estado_json['turno_actual_id'] = ultimo_ganador_id
+        await db_sync_to_async_save(self.partida)
+
+        await send_estado_jugadores(self, MessageTypes.START_GAME)
+        await self.iniciar_siguiente_turno()
 
     #-----------------------------------------------------------------------------------#
     # Métodos auxiliares                                                                #
