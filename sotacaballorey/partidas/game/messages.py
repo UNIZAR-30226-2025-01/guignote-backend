@@ -12,8 +12,8 @@ class MessageTypes:
     ROUND_RESULT = 'round_result'
     PHASE_UPDATE = 'phase_update'
     CARD_DRAWN = 'card_drawn'
-    ERROR = "error",
-    CANTO = "canto",
+    ERROR = "error"
+    CANTO = "canto"
     CAMBIO_SIETE = "cambio_siete"
 
 #-----------------------------------------------------------------------------------#

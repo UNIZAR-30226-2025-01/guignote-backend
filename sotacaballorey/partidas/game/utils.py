@@ -14,7 +14,9 @@ def obtener_o_crear_partida(usuario: Usuario, capacidad: int, solo_amigos: bool 
     for partida in partidas_disponibles:
         if not solo_amigos or tiene_amigos_en_partida(partida, usuario):
             return partida
-    return Partida.objects.create(capacidad=capacidad, solo_amigos=solo_amigos)
+    partida = Partida.objects.create(capacidad=capacidad, solo_amigos=solo_amigos)
+    partida.save()
+    return partida
 
 @database_sync_to_async
 def obtener_partida_por_id(id_partida: str):

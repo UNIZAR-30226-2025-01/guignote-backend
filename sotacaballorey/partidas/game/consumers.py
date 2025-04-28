@@ -94,6 +94,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, code):
         if hasattr(self, 'partida') and self.partida and self.usuario:
+            self.partida = await refresh(self.partida)
             jugador: JugadorPartida = await get_jugador(self.partida, self.usuario)
             if jugador:
                 if self.partida.estado == 'jugando':
@@ -666,7 +667,6 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     
     async def procesar_canto(self):
         """Procesa la acción de cantar de un jugador"""
-        estado_json = self.partida.estado_json
         jugador: JugadorPartida = await get_jugador(self.partida, self.usuario)
 
         # Validar que puede cantar
@@ -709,10 +709,11 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             self.partida.puntos_equipo_2 += puntos
         await db_sync_to_async_save(self.partida)
 
+        usuario = await sync_to_async(lambda: jugador.usuario)()
         await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.CANTO, {
             'jugador': {
-                'id': jugador.usuario.id,
-                'nombre': jugador.usuario.nombre,
+                'id': usuario.id,
+                'nombre': usuario.nombre,
                 'equipo': jugador.equipo
             },
             'cantos': canto_messages,
@@ -785,10 +786,11 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         await db_sync_to_async_save(jugador)
         await db_sync_to_async_save(self.partida)
 
+        usuario = await sync_to_async(lambda: jugador.usuario)()
         await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.CAMBIO_SIETE, {
             'jugador': {
-                'id': jugador.usuario.id,
-                'nombre': jugador.usuario.nombre,
+                'id': usuario.id,
+                'nombre': usuario.nombre,
                 'equipo': jugador.equipo
             },
             'carta_robada': carta_triunfo_actual
