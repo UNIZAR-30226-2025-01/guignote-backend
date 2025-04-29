@@ -69,9 +69,10 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
         if jugador:
             jugador.channel_name = self.channel_name
+            jugador.conectado = True
             await db_sync_to_async_save(jugador)
 
-        if created:
+        if created or self.partida.estado == 'pausada':
             await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PLAYER_JOINED, data={
                 'message': f'{self.usuario.nombre} se ha unido a la partida.',
                 'usuario': {
@@ -82,12 +83,10 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 'capacidad': self.capacidad,
                 'jugadores': await contar_jugadores(self.partida)
             })
-        else:
-            # Si te reconectas envíamos más información para que frontend
-            # pueda reconstruir estado partida
+
+        if self.partida.estado == 'jugando':
             await send_estado_jugadores(self, MessageTypes.START_GAME, solo_jugador=jugador)
 
-        # Comprobar si se inicia la partida
         await self.comprobar_inicio_partida()
     
     #------------------------------------------------------------------------------------
@@ -97,15 +96,16 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             self.partida = await refresh(self.partida)
             jugador: JugadorPartida = await get_jugador(self.partida, self.usuario)
             if jugador:
-                if self.partida.estado == 'jugando':
-                    # Si la partida está en estado 'jugando' desconectamos
-                    # al usuario, pero no lo echamos de la partida
+                if self.partida.estado in ['jugando', 'pausada']:
+                    # Si la partida está en curso, marcamos decomo desconectado
+                    # pero no lo eliminamos de la partida
                     jugador.conectado = False
                     await db_sync_to_async_save(jugador)
 
-                else:
+                elif self.partida.estado == 'esperando':
                     # Si aún no ha empezado ('esperando') lo podemos echar
-                    # de la partida
+                    # de la partida. Si todos se desconectan antes de que comienze
+                    # la partida, se elimina
                     await db_sync_to_async_delete(jugador)
                     count_jugadores = await contar_jugadores(self.partida)
                     if count_jugadores == 0:
@@ -144,6 +144,10 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await self.procesar_canto()
         elif accion == 'cambiar_siete':
             await self.procesar_cambio_siete()
+        elif accion == 'pausa':
+            await self.procesar_pausa()
+        elif accion == 'anular_pausa':
+            await self.procesar_anular_pausa()
 
     #-----------------------------------------------------------------------------------#
     # Lógica de inicio de partida                                                       #
@@ -155,20 +159,34 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         todavía no ha sido iniciada). Si es posible, inicia turno
         """
         count_jugadores: int = await contar_jugadores(self.partida)
-        if count_jugadores == self.capacidad and self.partida.estado == 'esperando':
+
+        if count_jugadores == self.capacidad:
+            if self.partida.estado == 'pausada':
+                self.partida.jugadores_pausa = []
             
-            # Cambiar estado a 'jugando'
-            self.partida.estado = 'jugando'
-            await db_sync_to_async_save(self.partida)
+                # Cambiar estado a 'jugando'
+                self.partida.estado = 'jugando'
+                await db_sync_to_async_save(self.partida)
 
-            # Barajar y repartir
-            await self.iniciar_partida()
+                # Enviar estado de la partida a todos
+                await send_estado_jugadores(self, MessageTypes.START_GAME)
 
-            # Enviar que la partida ha iniciado y estado (cartas, equipos...)
-            await send_estado_jugadores(self, MessageTypes.START_GAME)
+                # Si estaba en medio de un turno, reanudar
+                await self.iniciar_siguiente_turno()
+            
+            elif self.partida.estado == 'esperando':
+                # Cambiar estado a 'jugando'
+                self.partida.estado = 'jugando'
+                await db_sync_to_async_save(self.partida)
 
-            # Iniciar el primer turno
-            await self.iniciar_siguiente_turno()
+                # Barajar y repartir
+                await self.iniciar_partida()
+
+                # Enviar que la partida ha iniciado y estado (cartas, equipos...)
+                await send_estado_jugadores(self, MessageTypes.START_GAME)
+
+                # Iniciar el primer turno
+                await self.iniciar_siguiente_turno()
 
     async def iniciar_partida(self):
         """
@@ -396,8 +414,6 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         
         palo_inicial = baza[0]['carta']['palo']
         palo_triunfo = estado_json['triunfo']
-        jugador_id = jugador.id
-        equipo_ganador = jugador.equipo
 
         # Función para ver si una carta gana
         def gana(carta_a, carta_b):
@@ -442,14 +458,9 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         for jugada in baza_actual:
             puntos_totales += self.valor_carta(jugada['carta'])
 
-        # Identificamos triunfos y no triunfos
-        mejor_jugada = None
-        for jugada in baza_actual:
-            if mejor_jugada is None:
-                mejor_jugada = jugada
-            else:
-                mejor_jugada = self.comparar_cartas(
-                    mejor_jugada, jugada, palo_inicial, palo_triunfo)
+        mejor_jugada = baza_actual[0]
+        for jugada in baza_actual[1:]:
+            mejor_jugada = self.comparar_cartas(mejor_jugada, jugada, palo_inicial, palo_triunfo)
 
         return (mejor_jugada['jugador_id'], puntos_totales)
     
@@ -461,19 +472,23 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         # Prioridad palo de triunfo
         if c_ganadora['palo'] == palo_triunfo and c_nueva['palo'] != palo_triunfo:
             return jugada_actual
-        elif c_nueva['palo'] == palo_triunfo:
+        elif c_nueva['palo'] == palo_triunfo and c_ganadora['palo'] != palo_triunfo:
             return jugada_nueva
         
         # Prioridad palo inicial de la baza
         if c_ganadora['palo'] == palo_inicial and c_nueva['palo'] != palo_inicial:
             return jugada_actual
-        elif c_nueva['palo'] == palo_inicial:
+        elif c_nueva['palo'] == palo_inicial and c_ganadora['palo'] != palo_inicial:
             return jugada_nueva
         
         # Comparación entre cartas del mismo palo
-        fuerza_ganadora = self.fuerza_carta(c_ganadora['valor'])
-        fuerza_nueva = self.fuerza_carta(c_nueva['valor'])
-        return jugada_nueva if fuerza_nueva < fuerza_ganadora else jugada_actual
+        if c_ganadora['palo'] == c_nueva['palo']:
+            fuerza_ganadora = self.fuerza_carta(c_ganadora['valor'])
+            fuerza_nueva = self.fuerza_carta(c_nueva['valor'])
+            return jugada_nueva if fuerza_nueva > fuerza_ganadora else jugada_actual
+
+        # Si las cartas son de diferente palo, devolvemos la carta que haya ganado
+        return jugada_actual
         
     def puntos_carta(self, valor: int) -> int:
         """Puntos que aporta una carta según su valor."""
@@ -812,3 +827,84 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             ultimo_ganador.equipo == jugador.equipo and
             len(estado_json.get('baza_actual', [])) == 0
         )
+    
+    #-----------------------------------------------------------------------------------#
+    # Pausar partida por acuerdo                                                                     #
+    #-----------------------------------------------------------------------------------#
+
+    async def procesar_pausa(self):
+        """Procesa la solicitud de pausar la partida"""
+        if self.partida.estado != 'jugando':
+            await send_error(self.send, 'Solo se puede pausar partidas en curso')
+            return
+        
+        jugador = await get_jugador(self.partida, self.usuario)
+        if not jugador:
+            await send_error(self.send, 'No estás en la partida')
+            return
+        
+        # Añadir a lista de jugadores que han pedido pausa
+        if str(jugador.id) not in self.partida.jugadores_pausa:
+            self.partida.jugadores_pausa.append(str(jugador.id))
+            await db_sync_to_async_save(self.partida)
+            
+            usuario = await sync_to_async(lambda: jugador.usuario)()
+            await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PAUSE, {
+                'jugador': {
+                    'id': usuario.id,
+                    'nombre': usuario.nombre,
+                    'equipo': jugador.equipo
+                },
+                'num_solicitudes_pausa': len(self.partida.jugadores_pausa) 
+            })
+
+        # Si todos han pedido pausa, pausamos la partida
+        if len(self.partida.jugadores_pausa) >= self.capacidad:
+            await self.pausar_partida()
+
+    async def procesar_anular_pausa(self):
+        """Procesa la solicitud de anular una pausa pendiente"""
+        if self.partida.estado != 'jugando':
+            await send_error(self.send, 'No hay pausa pendiente')
+            return
+        
+        jugador = await get_jugador(self.partida, self.usuario)
+        if not jugador:
+            await send_error(self.send, 'No estás en esta partida')
+            return
+        
+        # Quitar de la lista de jugadores que han pedido la pausa al jugador
+        if str(jugador.id) in self.partida.jugadores_pausa:
+            self.partida.jugadores_pausa.remove(str(jugador.id))
+            await db_sync_to_async_save(self.partida)
+
+            usuario = await sync_to_async(lambda: jugador.usuario)()
+            await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.RESUME, {
+                'jugador': {
+                    'id': usuario.id,
+                    'nombre': usuario.nombre,
+                    'equipo': jugador.equipo
+                },
+                'num_solicitudes_pausa': len(self.partida.jugadores_pausa) 
+            })
+        
+    async def pausar_partida(self):
+        """Pausa la partida y desconecta a todos los jugadores"""
+        self.partida.estado = 'pausada'
+        await db_sync_to_async_save(self.partida)
+        
+        await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.ALL_PAUSE, {
+            'message': 'La partida ha sido pausada por acuerdo de todos los jugadores.'
+        })
+
+        # Desconectar a los jugadores
+        jugadores = await get_jugadores(self.partida)
+        for jugador in jugadores:
+            if jugador.channel_name:
+                await self.channel_layer.send(jugador.channel_name, {
+                    'type': 'close_connection'
+                })
+
+    async def close_connection(self, event=None):
+        """Cierra la conexión del websocket"""
+        await self.close()

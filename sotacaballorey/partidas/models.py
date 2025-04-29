@@ -6,6 +6,7 @@ from django.db import models
 ESTADOS_PARTIDA = [
     ('esperando', 'Esperando'),
     ('jugando', 'Jugando'),
+    ('pausada', 'Pausada'),
     ('terminada', 'Terminada'),
 ]
 
@@ -30,6 +31,7 @@ class Partida(models.Model):
     solo_amigos = models.BooleanField(default=False)
     es_revueltas = models.BooleanField(default=False)
     cantos_realizados = models.JSONField(default=dict)
+    jugadores_pausa = models.JSONField(default=list)
 
     def __str__(self):
         return f'Partida {self.id} - {self.capacidad} jugadores ({self.estado})'

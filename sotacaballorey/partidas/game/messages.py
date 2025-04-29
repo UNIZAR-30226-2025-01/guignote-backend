@@ -15,6 +15,9 @@ class MessageTypes:
     ERROR = "error"
     CANTO = "canto"
     CAMBIO_SIETE = "cambio_siete"
+    PAUSE = "pause"
+    ALL_PAUSE = "all_pause"
+    RESUME = "resume"
 
 #-----------------------------------------------------------------------------------#
 # Métodos para enviar mensajes al front-end                                         #
