@@ -70,3 +70,46 @@ def listar_salas_reconectables(request):
     } for p in partidas]
 
     return JsonResponse({'salas': salas_json}, status=200)
+
+@csrf_exempt
+@token_required
+def listar_salas_amigos(request):
+    """
+    Lista de salas con amigos disponibles para unirse
+    ├─ Método HTTP: GET
+    ├─ Cabecera petición con Auth:<token>
+    └─ Devuelve salas donde haya al menos un amigo y el usuario aún no esté
+    """
+
+    # Método incorrecto
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+    usuario = request.usuario
+    amigos = usuario.amigos.all()
+
+    # Partidas en espera donde hay al menos un amigo y el usuario no está
+    partidas = Partida.objects.filter(
+        estado='esperando',
+        jugadores__usuario__in=amigos
+    ).exclude(
+        jugadores__usuario=usuario
+    ).annotate(
+        num_jugadores=Count('jugadores')
+    ).distinct()
+
+    salas_json = []
+
+    for p in partidas:
+        amigos_en_sala = p.jugadores.filter(usuario__in=amigos).select_related('usuario')
+        nombres_amigos = [j.usuario.nombre for j in amigos_en_sala]
+
+        salas_json.append({
+            'id': p.id,
+            'nombre': f'Sala {p.id}',
+            'capacidad': p.capacidad,
+            'num_jugadores': p.num_jugadores,
+            'amigos': nombres_amigos
+        })
+
+    return JsonResponse({'salas': salas_json}, status=200)

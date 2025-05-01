@@ -82,3 +82,52 @@ class SalaTests(TestCase):
         self.assertIn(p1.id, ids)
         self.assertNotIn(p2.id, ids)
         self.assertNotIn(p3.id, ids)
+
+    def test_listar_salas_amigos(self):
+        """
+        Test que verifica que solo se listan salas en las que hay amigos,
+        el usuario no está, y están en estado 'esperando'.
+        También comprueba que los nombres de amigos se devuelven correctamente.
+        """
+        # Crear amigos y no amigos
+        amigo1 = Usuario.objects.create(nombre='Amigo1', correo='amigo1@gmail.com', contrasegna='123')
+        amigo2 = Usuario.objects.create(nombre='Amigo2', correo='amigo2@gmail.com', contrasegna='123')
+        no_amigo = Usuario.objects.create(nombre='Otro', correo='otro@gmail.com', contrasegna='123')
+
+        # Establecer amistad
+        self.usuario.amigos.add(amigo1, amigo2)
+
+        # Sala con amigo1, estado esperando
+        p1 = Partida.objects.create(capacidad=4, estado='esperando')
+        JugadorPartida.objects.create(partida=p1, usuario=amigo1)
+
+        # Sala con amigo2, pero usuario ya está dentro, debe ignorarse
+        p2 = Partida.objects.create(capacidad=4, estado='esperando')
+        JugadorPartida.objects.create(partida=p2, usuario=amigo2)
+        JugadorPartida.objects.create(partida=p2, usuario=self.usuario)
+
+        # Sala con no_amigo, debe ignorarse
+        p3 = Partida.objects.create(capacidad=4, estado='esperando')
+        JugadorPartida.objects.create(partida=p3, usuario=no_amigo)
+
+        # Sala con amigo1 pero estado != esperando, ignorar
+        p4 = Partida.objects.create(capacidad=4, estado='jugando')
+        JugadorPartida.objects.create(partida=p4, usuario=amigo1)
+
+        # Realizamos la petición
+        respuesta = self.cliente.get('/salas/disponibles/amigos/', HTTP_AUTH=self.token)
+        self.assertEqual(respuesta.status_code, 200)
+        salas = respuesta.json().get('salas', [])
+        ids = [s['id'] for s in salas]
+
+        # Solo debe aparecer p1
+        self.assertIn(p1.id, ids)
+        self.assertNotIn(p2.id, ids)
+        self.assertNotIn(p3.id, ids)
+        self.assertNotIn(p4.id, ids)
+        self.assertEqual(len(salas), 1)
+
+        # Verificamos que devuelve nombre del amigo correctamente
+        sala = salas[0]
+        self.assertIn('amigos', sala)
+        self.assertIn('Amigo1', sala['amigos'])
