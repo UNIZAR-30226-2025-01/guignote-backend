@@ -18,6 +18,7 @@ class MessageTypes:
     PAUSE = "pause"
     ALL_PAUSE = "all_pause"
     RESUME = "resume"
+    DEBUG_STATE = "debug_state"
 
 #-----------------------------------------------------------------------------------#
 # Métodos para enviar mensajes al front-end                                         #
@@ -75,3 +76,10 @@ async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartid
                 'msg_type': msg_type,
                 'data': data_para_jugador
             })
+
+async def send_debug_state(consumer, estado_json):
+    """Envía el estado actual de la partida para debugging"""
+    await consumer.send(text_data=json.dumps({
+        'type': MessageTypes.DEBUG_STATE,
+        'data': estado_json
+    }))
