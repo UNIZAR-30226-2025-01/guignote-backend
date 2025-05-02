@@ -19,6 +19,7 @@ class MessageTypes:
     ALL_PAUSE = "all_pause"
     RESUME = "resume"
     DEBUG_STATE = "debug_state"
+    SCORE_UPDATE = "score_update"
 
 #-----------------------------------------------------------------------------------#
 # Métodos para enviar mensajes al front-end                                         #

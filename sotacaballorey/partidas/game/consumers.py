@@ -179,6 +179,19 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         elif accion == 'debug_finalizar':
             # Debug action to trigger finalizar_partida
             await self.finalizar_partida()
+        elif accion == 'debug_set_score':
+            # Debug action to set scores for both teams
+            puntos_equipo1 = data.get('puntos_equipo1', 0)
+            puntos_equipo2 = data.get('puntos_equipo2', 0)
+            
+            self.partida.puntos_equipo_1 = puntos_equipo1
+            self.partida.puntos_equipo_2 = puntos_equipo2
+            await db_sync_to_async_save(self.partida)
+            
+            await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.SCORE_UPDATE, data={
+                'puntos_equipo_1': puntos_equipo1,
+                'puntos_equipo_2': puntos_equipo2
+            })
 
     #-----------------------------------------------------------------------------------#
     # Lógica de inicio de partida                                                       #
@@ -664,9 +677,14 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         jugadores = await get_jugadores(self.partida)
         equipo1 = [j for j in jugadores if j.equipo == 1]
         equipo2 = [j for j in jugadores if j.equipo == 2]
+        
 
         # Update ELOs
         if self.capacidad == 2:
+            if not equipo1 or not equipo2:
+                print("Error: Missing team members for 1v1 game")
+                return
+                
             # 1v1 game
             jugador1 = equipo1[0]
             jugador2 = equipo2[0]
@@ -678,12 +696,16 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             # Calculate new ELOs
             resultado = 1 if ganador == 1 else 0
             nuevo_elo1, nuevo_elo2 = calcular_nuevo_elo(elo1, elo2, resultado)
-            
+
             # Update ELOs
             await sync_to_async(lambda: setattr(jugador1.usuario, 'elo', nuevo_elo1))()
             await sync_to_async(lambda: setattr(jugador2.usuario, 'elo', nuevo_elo2))()
             await sync_to_async(lambda: jugador1.usuario.save())()
             await sync_to_async(lambda: jugador2.usuario.save())()
+            
+            # Verify saved ELOs
+            saved_elo1 = await sync_to_async(lambda: jugador1.usuario.elo)()
+            saved_elo2 = await sync_to_async(lambda: jugador2.usuario.elo)()
             
         else:
             # 2v2 game
