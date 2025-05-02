@@ -85,6 +85,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 'jugadores': await contar_jugadores(self.partida)
             })
 
+
         if self.partida.estado == 'jugando':
             await send_estado_jugadores(self, MessageTypes.START_GAME, solo_jugador=jugador)
 
@@ -103,7 +104,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     jugador.conectado = False
                     await db_sync_to_async_save(jugador)
 
-                elif self.partida.estado == 'esperando':
+                elif self.partida.estado in ['esperando', 'finalizada']:
                     # Si aún no ha empezado ('esperando') lo podemos echar
                     # de la partida. Si todos se desconectan antes de que comienze
                     # la partida, se elimina
@@ -733,8 +734,6 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             'puntos_equipo_2': e2,
         })
 
-        await db_sync_to_async_delete(self.partida)
-
     async def iniciar_revueltas(self):
         """Inicia la partida de revueltas"""
         # Guardamos el ganador de la baza final, que será quien tenga el primer turno
@@ -954,6 +953,17 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 },
                 'num_solicitudes_pausa': len(self.partida.jugadores_pausa) 
             })
+
+            # Check if this is a friend-only match and pause it
+
+            
+            if self.partida.solo_amigos:
+                self.partida.estado = 'pausada'
+                await db_sync_to_async_save(self.partida)
+                await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.ALL_PAUSE, data={
+                    'message': 'La partida ha sido pausada por ser una partida entre amigos.',
+                    'estado': 'pausada'
+                })
 
         # Si todos han pedido pausa, pausamos la partida
         if len(self.partida.jugadores_pausa) >= self.capacidad:
