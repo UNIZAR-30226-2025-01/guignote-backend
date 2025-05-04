@@ -41,7 +41,6 @@ class TestEloUpdates(TransactionTestCase):
     def test_elo_updates_after_match(self):
         async def inner():
 
-
             # Connect first user
             url1 = f'/ws/partida/?token={self.token1}&capacidad=2'
             comm1 = WebsocketCommunicator(application, url1)
@@ -96,8 +95,6 @@ class TestEloUpdates(TransactionTestCase):
             self.assertTrue(data['type'], 'turn_update')
             turno = data['data']['jugador']['id']
             
-
-
             # Set up game state to trigger end game using debug function
             await comm1.send_to(json.dumps({
                 'accion': 'debug_set_score',
@@ -169,9 +166,19 @@ class TestEloUpdates(TransactionTestCase):
             await sync_to_async(self.user1.refresh_from_db)()
             await sync_to_async(self.user2.refresh_from_db)()
 
-            # Check that ELOs have been updated
+            # Ganador
             self.assertNotEqual(self.user1.elo, 1200)  # Should have increased
-            self.assertNotEqual(self.user2.elo, 1200)  # Should have decreased
-            self.assertGreater(self.user1.elo, self.user2.elo)  # Winner should have higher ELO
+            self.assertEqual(self.user1.victorias, 1)
+            self.assertEqual(self.user1.racha_victorias, 1)
+            self.assertEqual(self.user1.mayor_racha_victorias, 1)
+            self.assertEqual(self.user1.derrotas, 0)
 
+            # Perdedor
+            self.assertNotEqual(self.user2.elo, 1200)  # Should have decreased
+            self.assertEqual(self.user2.victorias, 0)
+            self.assertEqual(self.user2.racha_victorias, 0)
+            self.assertEqual(self.user2.mayor_racha_victorias, 0)
+            self.assertEqual(self.user2.derrotas, 1)
+
+            self.assertGreater(self.user1.elo, self.user2.elo)  # Winner should have higher ELO
         async_to_sync(inner)()

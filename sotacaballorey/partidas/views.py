@@ -69,7 +69,6 @@ def listar_salas_reconectables(request):
     ).annotate(num_jugadores=Count('jugadores'))
 
     # Devolver salas
-    # Devolver salas
     salas_json = []
     for p in partidas:
         jugadores = p.jugadores.all()
@@ -101,15 +100,22 @@ def listar_salas_pausadas(request):
     
     partidas = Partida.objects.filter(
         estado='pausada',
+        jugadores__usuario=request.usuario
     ).annotate(num_jugadores=Count('jugadores'))
 
     # Devolver salas
-    salas_json = [{
-        'id': p.id,
-        'nombre': f'Sala {p.id}',
-        'capacidad': p.capacidad,
-        'num_jugadores': p.num_jugadores
-    } for p in partidas]
+    salas_json = []
+    for p in partidas:
+        jugadores = p.jugadores.all()
+        nombre_jugadores = [j.usuario.nombre for j in jugadores]
+
+        salas_json.append({
+            'id': p.id,
+            'nombre': f'Sala {p.id}',
+            'capacidad': p.capacidad,
+            'num_jugadores': p.num_jugadores,
+            'jugadores': nombre_jugadores
+        })
 
     return JsonResponse({'salas': salas_json}, status=200)
 

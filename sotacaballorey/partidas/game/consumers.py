@@ -16,7 +16,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     Consumer que maneja la lógica de partidas de guiñote.
     """
 
-    TIEMPO_TURNO = 60 # en segundos
+    TIEMPO_TURNO = 15 # en segundos
     palos = ['Oros', 'Copas', 'Espadas', 'Bastos']
     timer_task = None
 
@@ -81,6 +81,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     'id': self.usuario.id
                 },
                 'chat_id': await obtener_chat_id(self.partida),
+                'partida_id': self.partida.id,
                 'capacidad': self.capacidad,
                 'jugadores': await contar_jugadores(self.partida)
             })
@@ -103,6 +104,10 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     # pero no lo eliminamos de la partida
                     jugador.conectado = False
                     await db_sync_to_async_save(jugador)
+
+                    if self.partida.estado == 'jugando' and str(jugador.id) not in self.partida.jugadores_pausa:
+                        await self.procesar_pausa()
+                        await db_sync_to_async_save(self.partida)
 
                 elif self.partida.estado in ['esperando', 'finalizada']:
                     # Si aún no ha empezado ('esperando') lo podemos echar
@@ -674,12 +679,13 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await self.iniciar_revueltas()
             return
 
+        await actualizar_estadisticas(self.partida, ganador)
+
         # Get all players
         jugadores = await get_jugadores(self.partida)
         equipo1 = [j for j in jugadores if j.equipo == 1]
         equipo2 = [j for j in jugadores if j.equipo == 2]
         
-
         # Update ELOs
         if self.capacidad == 2:
             if not equipo1 or not equipo2:
@@ -954,19 +960,8 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 'num_solicitudes_pausa': len(self.partida.jugadores_pausa) 
             })
 
-            # Check if this is a friend-only match and pause it
-
-            
-            if self.partida.solo_amigos:
-                self.partida.estado = 'pausada'
-                await db_sync_to_async_save(self.partida)
-                await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.ALL_PAUSE, data={
-                    'message': 'La partida ha sido pausada por ser una partida entre amigos.',
-                    'estado': 'pausada'
-                })
-
         # Si todos han pedido pausa, pausamos la partida
-        if len(self.partida.jugadores_pausa) >= self.capacidad:
+        if len(self.partida.jugadores_pausa) >= self.capacidad or self.partida.solo_amigos:
             await self.pausar_partida()
 
     async def procesar_anular_pausa(self):
@@ -1007,6 +1002,8 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         # Desconectar a los jugadores
         jugadores = await get_jugadores(self.partida)
         for jugador in jugadores:
+            jugador.conectado = False
+            await db_sync_to_async_save(jugador)
             if jugador.channel_name:
                 await self.channel_layer.send(jugador.channel_name, {
                     'type': 'close_connection'

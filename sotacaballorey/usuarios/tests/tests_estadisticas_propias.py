@@ -91,8 +91,8 @@ class EstadisticasUsuarioTestCase(TestCase):
             "porcentaje_victorias": round((self.usuario1.victorias / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2),
             "imagen": None,
             "porcentaje_derrotas": round((self.usuario1.derrotas / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2),
-            "elo_parejas": 1200,
-            "elo": 1200
+            "elo_parejas": 0,
+            "elo": 0
         }
 
         self.assertEqual(response.json(), expected_data)

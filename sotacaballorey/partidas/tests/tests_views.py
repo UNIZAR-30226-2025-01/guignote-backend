@@ -132,3 +132,33 @@ class SalaTests(TestCase):
         sala = salas[0]
         self.assertIn('amigos', sala)
         self.assertIn('Amigo1', sala['amigos'])
+
+    def test_listar_salas_pausadas(self):
+        """
+        Test de petición que lista las salas pausadas. Estas salas deben estar en estado
+        'pausada' y tener al usuario como uno de los jugadores
+        """
+
+        # Creamos partida en la que el usuario está
+        p1 = Partida.objects.create(capacidad=2, estado='pausada')
+        JugadorPartida.objects.create(partida=p1, usuario=self.usuario)
+
+        # Creamos partida en la que el usuario no está
+        p2 = Partida.objects.create(capacidad=2, estado='pausada')
+        jugador2 = Usuario.objects.create(nombre='Jugador 2', correo='j2@gmail.com', contrasegna='123')
+        JugadorPartida.objects.create(partida=p2, usuario=jugador2)
+
+        # Creamos partida con un estado diferente a 'pausada'
+        p3 = Partida.objects.create(capacidad=2, estado='esperando')
+        JugadorPartida.objects.create(partida=p3, usuario=self.usuario)
+
+        respuesta = self.cliente.get('/salas/pausadas/', HTTP_AUTH=self.token)
+        self.assertEqual(respuesta.status_code, 200)
+        salas = respuesta.json().get('salas', [])
+        ids = [s['id'] for s in salas]
+
+        # Solo debe aparecer la sala p1
+        self.assertIn(p1.id, ids)
+        self.assertNotIn(p2.id, ids)
+        self.assertNotIn(p3.id, ids)
+        self.assertEqual(len(salas), 1)

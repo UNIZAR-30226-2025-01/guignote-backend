@@ -18,7 +18,7 @@ def calcular_nuevo_elo(rating_a, rating_b, resultado_a, k=32):
     nuevo_elo_a = rating_a + k * (resultado_a - expectativa_a)
     nuevo_elo_b = rating_b + k * ((1 - resultado_a) - expectativa_b)
 
-    return round(nuevo_elo_a), round(nuevo_elo_b)
+    return max(0, round(nuevo_elo_a)), max(0, round(nuevo_elo_b))
 
 def calcular_nuevo_elo_parejas(elo_jugadores, elo_rivales, resultado, k=32):
     """
@@ -43,7 +43,7 @@ def calcular_nuevo_elo_parejas(elo_jugadores, elo_rivales, resultado, k=32):
 
     # Elo update formula
     nuevo_elo = [
-        round(elo + k * (resultado - expected_win_prob))
+        max(0, round(elo + k * (resultado - expected_win_prob)))
         for elo in elo_jugadores
     ]
 
