@@ -497,7 +497,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     def fuerza_carta(self, valor: int) -> int:
         """Fuerza relativa de una carta para decidir quién gana la baza."""
         orden = [1, 3, 12, 10, 11, 7, 6, 5, 4, 2]
-        return orden.index(valor) if valor in orden else len(orden)
+        return len(orden) - orden.index(valor) if valor in orden else 0
 
     def valor_carta(self, carta) -> int:
         """Devuelve el valor de la carta"""

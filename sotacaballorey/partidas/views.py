@@ -29,15 +29,22 @@ def listar_salas_disponibles(request):
     else:
         partidas = Partida.objects.filter(estado='esperando')
 
+    partidas = partidas.exclude(jugadores__usuario=request.usuario)
     partidas = partidas.annotate(num_jugadores=Count('jugadores'))
 
     # Devolver salas
-    salas_json = [{
-        'id': p.id,
-        'nombre': f'Sala {p.id}',
-        'capacidad': p.capacidad,
-        'num_jugadores': p.num_jugadores
-    } for p in partidas]
+    salas_json = []
+    for p in partidas:
+        jugadores = p.jugadores.all()
+        nombre_jugadores = [j.usuario.nombre for j in jugadores]
+
+        salas_json.append({
+            'id': p.id,
+            'nombre': f'Sala {p.id}',
+            'capacidad': p.capacidad,
+            'num_jugadores': p.num_jugadores,
+            'jugadores': nombre_jugadores
+        })
 
     return JsonResponse({'salas': salas_json}, status=200)
 
@@ -62,12 +69,19 @@ def listar_salas_reconectables(request):
     ).annotate(num_jugadores=Count('jugadores'))
 
     # Devolver salas
-    salas_json = [{
-        'id': p.id,
-        'nombre': f'Sala {p.id}',
-        'capacidad': p.capacidad,
-        'num_jugadores': p.num_jugadores
-    } for p in partidas]
+    # Devolver salas
+    salas_json = []
+    for p in partidas:
+        jugadores = p.jugadores.all()
+        nombre_jugadores = [j.usuario.nombre for j in jugadores]
+
+        salas_json.append({
+            'id': p.id,
+            'nombre': f'Sala {p.id}',
+            'capacidad': p.capacidad,
+            'num_jugadores': p.num_jugadores,
+            'jugadores': nombre_jugadores
+        })
 
     return JsonResponse({'salas': salas_json}, status=200)
 
@@ -98,18 +112,20 @@ def listar_salas_amigos(request):
         num_jugadores=Count('jugadores')
     ).distinct()
 
+    # Listar salas
     salas_json = []
-
     for p in partidas:
-        amigos_en_sala = p.jugadores.filter(usuario__in=amigos).select_related('usuario')
-        nombres_amigos = [j.usuario.nombre for j in amigos_en_sala]
+        jugadores = p.jugadores.all()
+        amigos_en_sala = [j.usuario.nombre for j in jugadores if j.usuario in amigos]
+        resto_en_sala  = [j.usuario.nombre for j in jugadores if j.usuario not in amigos]
 
         salas_json.append({
             'id': p.id,
             'nombre': f'Sala {p.id}',
             'capacidad': p.capacidad,
             'num_jugadores': p.num_jugadores,
-            'amigos': nombres_amigos
+            'amigos': amigos_en_sala,
+            'resto': resto_en_sala
         })
 
     return JsonResponse({'salas': salas_json}, status=200)

@@ -29,6 +29,8 @@ class SalaTests(TestCase):
         p5 = Partida.objects.create(capacidad=4, estado='esperando')
         p6 = Partida.objects.create(capacidad=4, estado='jugando')
 
+        JugadorPartida.objects.create(partida=p5, usuario=self.usuario)        
+
         # Hacemos petición sin filtrar capacidad
         respuesta = self.cliente.get('/salas/disponibles/', HTTP_AUTH=self.token)
         self.assertEqual(respuesta.status_code, 200)
@@ -37,8 +39,7 @@ class SalaTests(TestCase):
         self.assertIn(p1.id, ids)
         self.assertIn(p2.id, ids)
         self.assertIn(p4.id, ids)
-        self.assertIn(p5.id, ids)
-        self.assertEqual(len(salas), 4)
+        self.assertEqual(len(salas), 3)
 
         # Filtamos capacidad=2
         respuesta = self.cliente.get('/salas/disponibles/?capacidad=2', HTTP_AUTH=self.token)
@@ -54,7 +55,7 @@ class SalaTests(TestCase):
         salas = respuesta.json().get('salas', [])
         for s in salas:
             self.assertEqual(s['capacidad'], 4)
-        self.assertEqual(len(salas), 2)
+        self.assertEqual(len(salas), 1)
 
     def test_listar_salas_reconectables(self):
         """
