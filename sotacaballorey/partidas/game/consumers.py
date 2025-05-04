@@ -9,6 +9,7 @@ from .utils import *
 import asyncio
 import random
 import json
+from partidas.elo import calcular_nuevo_elo, calcular_nuevo_elo_parejas
 
 class PartidaConsumer(AsyncWebsocketConsumer):
     """
@@ -84,6 +85,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 'jugadores': await contar_jugadores(self.partida)
             })
 
+
         if self.partida.estado == 'jugando':
             await send_estado_jugadores(self, MessageTypes.START_GAME, solo_jugador=jugador)
 
@@ -102,7 +104,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     jugador.conectado = False
                     await db_sync_to_async_save(jugador)
 
-                elif self.partida.estado == 'esperando':
+                elif self.partida.estado in ['esperando', 'finalizada']:
                     # Si aún no ha empezado ('esperando') lo podemos echar
                     # de la partida. Si todos se desconectan antes de que comienze
                     # la partida, se elimina
@@ -148,6 +150,49 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await self.procesar_pausa()
         elif accion == 'anular_pausa':
             await self.procesar_anular_pausa()
+        elif accion == 'debug_state':
+            # Get current game state
+            jugadores = await sync_to_async(list)(self.partida.jugadores.all())
+            jugadores_data = []
+            for j in jugadores:
+                usuario_id = await sync_to_async(lambda: j.usuario.id)()
+                usuario_nombre = await sync_to_async(lambda: j.usuario.nombre)()
+                jugadores_data.append({
+                    'usuario': {
+                        'id': usuario_id,
+                        'nombre': usuario_nombre
+                    },
+                    'equipo': j.equipo,
+                    'cartas_json': j.cartas_json
+                })
+            
+            estado = {
+                'partida': self.partida.estado_json,
+                'jugadores': jugadores_data,
+                'mazo': self.partida.estado_json.get('baraja', []),
+                'pozo': self.partida.estado_json.get('baza_actual', []),
+                'turno_actual': self.partida.estado_json.get('turno_actual_id'),
+                'estado': self.partida.estado,
+                'puntos_equipo_1': self.partida.puntos_equipo_1,
+                'puntos_equipo_2': self.partida.puntos_equipo_2
+            }
+            await send_debug_state(self, estado)
+        elif accion == 'debug_finalizar':
+            # Debug action to trigger finalizar_partida
+            await self.finalizar_partida()
+        elif accion == 'debug_set_score':
+            # Debug action to set scores for both teams
+            puntos_equipo1 = data.get('puntos_equipo1', 0)
+            puntos_equipo2 = data.get('puntos_equipo2', 0)
+            
+            self.partida.puntos_equipo_1 = puntos_equipo1
+            self.partida.puntos_equipo_2 = puntos_equipo2
+            await db_sync_to_async_save(self.partida)
+            
+            await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.SCORE_UPDATE, data={
+                'puntos_equipo_1': puntos_equipo1,
+                'puntos_equipo_2': puntos_equipo2
+            })
 
     #-----------------------------------------------------------------------------------#
     # Lógica de inicio de partida                                                       #
@@ -629,14 +674,65 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await self.iniciar_revueltas()
             return
 
+        # Get all players
+        jugadores = await get_jugadores(self.partida)
+        equipo1 = [j for j in jugadores if j.equipo == 1]
+        equipo2 = [j for j in jugadores if j.equipo == 2]
+        
+
+        # Update ELOs
+        if self.capacidad == 2:
+            if not equipo1 or not equipo2:
+                print("Error: Missing team members for 1v1 game")
+                return
+                
+            # 1v1 game
+            jugador1 = equipo1[0]
+            jugador2 = equipo2[0]
+            
+            # Get current ELOs
+            elo1 = await sync_to_async(lambda: jugador1.usuario.elo)()
+            elo2 = await sync_to_async(lambda: jugador2.usuario.elo)()
+            
+            # Calculate new ELOs
+            resultado = 1 if ganador == 1 else 0
+            nuevo_elo1, nuevo_elo2 = calcular_nuevo_elo(elo1, elo2, resultado)
+
+            # Update ELOs
+            await sync_to_async(lambda: setattr(jugador1.usuario, 'elo', nuevo_elo1))()
+            await sync_to_async(lambda: setattr(jugador2.usuario, 'elo', nuevo_elo2))()
+            await sync_to_async(lambda: jugador1.usuario.save())()
+            await sync_to_async(lambda: jugador2.usuario.save())()
+            
+            # Verify saved ELOs
+            saved_elo1 = await sync_to_async(lambda: jugador1.usuario.elo)()
+            saved_elo2 = await sync_to_async(lambda: jugador2.usuario.elo)()
+            
+        else:
+            # 2v2 game
+            elo_equipo1 = [await sync_to_async(lambda: j.usuario.elo_parejas)() for j in equipo1]
+            elo_equipo2 = [await sync_to_async(lambda: j.usuario.elo_parejas)() for j in equipo2]
+            
+            # Calculate new ELOs
+            resultado = 1 if ganador == 1 else 0
+            nuevo_elo1 = calcular_nuevo_elo_parejas(elo_equipo1, elo_equipo2, resultado)
+            nuevo_elo2 = calcular_nuevo_elo_parejas(elo_equipo2, elo_equipo1, 1 - resultado)
+            
+            # Update ELOs
+            for j, nuevo_elo in zip(equipo1, nuevo_elo1):
+                await sync_to_async(lambda: setattr(j.usuario, 'elo_parejas', nuevo_elo))()
+                await sync_to_async(lambda: j.usuario.save())()
+            
+            for j, nuevo_elo in zip(equipo2, nuevo_elo2):
+                await sync_to_async(lambda: setattr(j.usuario, 'elo_parejas', nuevo_elo))()
+                await sync_to_async(lambda: j.usuario.save())()
+
         await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.GAME_OVER, {
             'message': "Fin de la partida.",
             'ganador_equipo': ganador,
             'puntos_equipo_1': e1,
             'puntos_equipo_2': e2,
         })
-
-        await db_sync_to_async_delete(self.partida)
 
     async def iniciar_revueltas(self):
         """Inicia la partida de revueltas"""
@@ -857,6 +953,17 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 },
                 'num_solicitudes_pausa': len(self.partida.jugadores_pausa) 
             })
+
+            # Check if this is a friend-only match and pause it
+
+            
+            if self.partida.solo_amigos:
+                self.partida.estado = 'pausada'
+                await db_sync_to_async_save(self.partida)
+                await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.ALL_PAUSE, data={
+                    'message': 'La partida ha sido pausada por ser una partida entre amigos.',
+                    'estado': 'pausada'
+                })
 
         # Si todos han pedido pausa, pausamos la partida
         if len(self.partida.jugadores_pausa) >= self.capacidad:

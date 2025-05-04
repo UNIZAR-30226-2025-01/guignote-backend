@@ -87,6 +87,34 @@ def listar_salas_reconectables(request):
 
 @csrf_exempt
 @token_required
+def listar_salas_pausadas(request):
+    """
+    Lista de salas pausadas
+    ├─ Método HTTP: GET
+    ├─ Cabecera petición con Auth:<token>
+    └─ Devuelve lista de salas 'pausadas'
+    """
+
+    # Método incorrecto
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
+    
+    partidas = Partida.objects.filter(
+        estado='pausada',
+    ).annotate(num_jugadores=Count('jugadores'))
+
+    # Devolver salas
+    salas_json = [{
+        'id': p.id,
+        'nombre': f'Sala {p.id}',
+        'capacidad': p.capacidad,
+        'num_jugadores': p.num_jugadores
+    } for p in partidas]
+
+    return JsonResponse({'salas': salas_json}, status=200)
+
+@csrf_exempt
+@token_required
 def listar_salas_amigos(request):
     """
     Lista de salas con amigos disponibles para unirse

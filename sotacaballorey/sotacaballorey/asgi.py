@@ -36,7 +36,7 @@ class TokenAuthMiddleware:
         
 
         if usuario:
-            print(f"Usuario {usuario.nombre} autenticado en WebSocket", flush=True)
+            #print(f"Usuario {usuario.nombre} autenticado en WebSocket", flush=True)
             scope['usuario'] = usuario
         else:
             print(f"Token inválido o expirado. Cerrando conexión", flush=True)

@@ -7,7 +7,13 @@ def obtener_o_crear_partida(usuario: Usuario, capacidad: int, solo_amigos: bool 
     """
     Obtiene una partida disponible (no llena) de capacidad
     dada. Si no existe, la crea.
+    Si es una partida entre amigos (solo_amigos=True), crea una nueva partida directamente.
     """
+    if solo_amigos:
+        partida = Partida.objects.create(capacidad=capacidad, solo_amigos=True)
+        partida.save()
+        return partida
+
     partidas_disponibles: Partida = Partida.objects.filter(
         estado='esperando', capacidad=capacidad, solo_amigos=solo_amigos
     )
@@ -19,10 +25,21 @@ def obtener_o_crear_partida(usuario: Usuario, capacidad: int, solo_amigos: bool 
     return partida
 
 @database_sync_to_async
-def obtener_partida_por_id(id_partida: str):
-    """Obtiene una partida dado su id"""
+def obtener_partida_por_id(id_partida: str, usuario: Usuario = None):
+    """
+    Obtiene una partida dado su id.
+    Si la partida es entre amigos y se proporciona un usuario, verifica que tenga amigos en la partida.
+    """
     try:
-        return Partida.objects.get(id=id_partida)
+        partida = Partida.objects.get(id=id_partida)
+        if partida.solo_amigos and usuario:
+            # Check friends synchronously within the database_sync_to_async context
+            jugadores_ids = JugadorPartida.objects.filter(partida=partida).values_list('usuario_id', flat=True)
+            amigos_ids = usuario.amigos.values_list('id', flat=True)
+            tiene_amigos = any(j in amigos_ids for j in jugadores_ids) or not jugadores_ids
+            if not tiene_amigos:
+                return None
+        return partida
     except Partida.DoesNotExist:
         return None
 
@@ -31,9 +48,13 @@ def agregar_jugador(partida: Partida, usuario: Usuario):
     """Agrega el usuario a la partida"""
     jugadores_existentes = JugadorPartida.objects.filter(partida=partida)
 
-    # Validar amisma si es una partida entre amigos
-    if partida.solo_amigos and not tiene_amigos_en_partida(partida, usuario):
-        return None, False
+    if partida.solo_amigos:
+        # Check friends synchronously within the database_sync_to_async context
+        jugadores_ids = JugadorPartida.objects.filter(partida=partida).values_list('usuario_id', flat=True)
+        amigos_ids = usuario.amigos.values_list('id', flat=True)
+        tiene_amigos = any(j in amigos_ids for j in jugadores_ids) or not jugadores_ids
+        if not tiene_amigos:
+            return None, False
 
     count = jugadores_existentes.count()
     equipo = (count % 2) + 1
