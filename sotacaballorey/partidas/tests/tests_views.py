@@ -128,11 +128,6 @@ class SalaTests(TestCase):
         self.assertNotIn(p4.id, ids)
         self.assertEqual(len(salas), 1)
 
-        # Verificamos que devuelve nombre del amigo correctamente
-        sala = salas[0]
-        self.assertIn('amigos', sala)
-        self.assertIn('Amigo1', sala['amigos'])
-
     def test_listar_salas_pausadas(self):
         """
         Test de petición que lista las salas pausadas. Estas salas deben estar en estado

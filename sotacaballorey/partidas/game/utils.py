@@ -3,18 +3,17 @@ from channels.db import database_sync_to_async
 from usuarios.models import Usuario
 
 @database_sync_to_async
-def obtener_o_crear_partida(usuario: Usuario, capacidad: int, solo_amigos: bool = False):
+def obtener_o_crear_partida(usuario: Usuario, capacidad: int):
     """
     Obtiene una partida disponible (no llena) de capacidad
     dada. Si no existe, la crea.
     """
     partidas_disponibles: Partida = Partida.objects.filter(
-        estado='esperando', capacidad=capacidad, solo_amigos=solo_amigos
-    )
-    for partida in partidas_disponibles:
-        if not solo_amigos or _tiene_amigos_en_partida(partida, usuario):
-            return partida
-    partida = Partida.objects.create(capacidad=capacidad, solo_amigos=solo_amigos)
+        estado='esperando', capacidad=capacidad, es_personalizada=False
+    ).exclude(jugadores__usuario=usuario)
+    if partidas_disponibles:
+        return partidas_disponibles[0]
+    partida = Partida.objects.create(capacidad=capacidad)
     partida.save()
     return partida
 
@@ -31,20 +30,14 @@ def agregar_jugador(partida: Partida, usuario: Usuario):
     """Agrega el usuario a la partida"""
     jugadores_existentes = JugadorPartida.objects.filter(partida=partida)
 
-    if partida.solo_amigos and not _tiene_amigos_en_partida(partida, usuario):
-        return None, False
-
-    count = jugadores_existentes.count()
-    equipo = (count % 2) + 1
-
+    equipo = (jugadores_existentes.count() % 2) + 1
     jugador, created = JugadorPartida.objects.get_or_create(
         partida=partida,
         usuario=usuario,
-        defaults={'equipo': equipo, 'conectado': True}
+        defaults={'equipo': equipo}
     )
-    if not created:
-        jugador.conectado = True
-        jugador.save()
+    jugador.conectado = True
+    jugador.save()
     return (jugador, created)
 
 @database_sync_to_async
@@ -81,7 +74,7 @@ def _tiene_amigos_en_partida(partida: Partida, usuario: Usuario) -> bool:
 
 @database_sync_to_async
 def tiene_amigos_en_partida(partida: Partida, usuario: Usuario) -> bool:
-    _tiene_amigos_en_partida(partida, usuario)
+    return _tiene_amigos_en_partida(partida, usuario)
 
 @database_sync_to_async
 def get_jugador_by_id(jp_id):
@@ -130,7 +123,7 @@ def actualizar_estadisticas(partida: Partida, ganador_equipo):
     jugadores = list(partida.jugadores.all())
     for jugador in jugadores:
         usuario = jugador.usuario
-        if jugador.equipo == ganador_equipo:
+        if ganador_equipo == 0 or jugador.equipo == ganador_equipo:
             usuario.victorias += 1
             usuario.racha_victorias += 1
             if usuario.racha_victorias > usuario.mayor_racha_victorias:
@@ -138,4 +131,92 @@ def actualizar_estadisticas(partida: Partida, ganador_equipo):
         else:
             usuario.derrotas += 1
             usuario.racha_victorias = 0
-        usuario.save() 
+        usuario.save()
+
+def _buscar_partida_personalizada(
+    usuario: Usuario,
+    capacidad: int,
+    solo_amigos: bool,
+    tiempo_turno: int,
+    permitir_revueltas: bool,
+    reglas_arrastre: bool
+):
+    """Busca una partida personalizada con la configuración dada"""
+    partidas = Partida.objects.filter(
+        es_personalizada=True,
+        capacidad=capacidad,
+        solo_amigos=solo_amigos,
+        tiempo_turno=tiempo_turno,
+        permitir_revueltas=permitir_revueltas,
+        reglas_arrastre=reglas_arrastre,
+        estado='esperando'
+    ).exclude(jugadores__usuario=usuario)
+    for partida in partidas:
+        num_jugadores = JugadorPartida.objects.filter(partida=partida, conectado=True).count()
+        if num_jugadores < partida.capacidad:
+            return partida
+    return None
+
+def _crear_partida_personalizada(
+    capacidad: int,
+    solo_amigos: bool,
+    tiempo_turno: int,
+    permitir_revueltas: bool,
+    reglas_arrastre: bool
+):
+    """Crea una partida personalizada con la configuración dada"""
+    partida = Partida(
+        es_personalizada=True,
+        capacidad=capacidad,
+        solo_amigos=solo_amigos,
+        tiempo_turno=tiempo_turno,
+        permitir_revueltas=permitir_revueltas,
+        reglas_arrastre=reglas_arrastre
+    )
+    if partida:
+        partida.save()
+        return partida
+    return None
+
+def _obtener_config_personalizada(params: dict):
+    """Leer parámetros de la URL de conexión a una partida personalizada"""
+    try:
+        capacidad = int(params.get('capacidad', 2))
+        capacidad = 2 if capacidad not in [2,4] else capacidad
+    except Exception:
+        capacidad = 2
+    
+    try:
+        tiempo_turno = int(params.get('tiempo_turno', 30))
+        if tiempo_turno not in [15, 30, 60]:
+            tiempo_turno = 30
+    except:
+        tiempo_turno = 30
+
+    solo_amigos = params.get('solo_amigos', ['false'])[0].lower() == 'true'
+    permitir_revueltas = params.get('permitir_revueltas', ['true'])[0].lower() == 'true'
+    reglas_arrastre = params.get('reglas_arrastre', ['true'])[0].lower() == 'true'
+
+    return capacidad, solo_amigos, tiempo_turno, permitir_revueltas, reglas_arrastre
+
+@database_sync_to_async
+def obtener_o_crear_partida_personalizada(
+    usuario: Usuario,
+    params: dict
+):
+    """
+    Obtiene una partida con la configuración dada. Si no la encuentra, en su defecto,
+    crea una nueva partida con dicha configuración
+    """
+
+    # Obtener y parsear parámetros de la url
+    capacidad, solo_amigos, tiempo_turno, permitir_revueltas, reglas_arrastre = \
+        _obtener_config_personalizada(params)
+    
+    # Buscar o crear partida
+    p: Partida = _buscar_partida_personalizada(
+        usuario, capacidad, solo_amigos, tiempo_turno, permitir_revueltas, reglas_arrastre)
+    if not p:
+        p = _crear_partida_personalizada(
+            capacidad, solo_amigos, tiempo_turno, permitir_revueltas, reglas_arrastre)
+    return p

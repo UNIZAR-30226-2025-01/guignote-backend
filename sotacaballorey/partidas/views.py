@@ -23,28 +23,22 @@ def listar_salas_disponibles(request):
     capacidad = request.GET.get('capacidad')
 
     if capacidad == '2':
-        partidas = Partida.objects.filter(estado='esperando', capacidad=2)
+        partidas = Partida.objects.filter(
+            estado='esperando', capacidad=2, solo_amigos=False)
     elif capacidad == '4':
-        partidas = Partida.objects.filter(estado='esperando', capacidad=4)
+        partidas = Partida.objects.filter(
+            estado='esperando', capacidad=4, solo_amigos=False)
     else:
-        partidas = Partida.objects.filter(estado='esperando')
+        partidas = Partida.objects.filter(
+            estado='esperando', solo_amigos=False)
 
     partidas = partidas.exclude(jugadores__usuario=request.usuario)
     partidas = partidas.annotate(num_jugadores=Count('jugadores'))
 
     # Devolver salas
-    salas_json = []
-    for p in partidas:
-        jugadores = p.jugadores.all()
-        nombre_jugadores = [j.usuario.nombre for j in jugadores]
-
-        salas_json.append({
-            'id': p.id,
-            'nombre': f'Sala {p.id}',
-            'capacidad': p.capacidad,
-            'num_jugadores': p.num_jugadores,
-            'jugadores': nombre_jugadores
-        })
+    salas_json = [
+        construir_sala_json(p)
+    for p in partidas]
 
     return JsonResponse({'salas': salas_json}, status=200)
 
@@ -69,18 +63,9 @@ def listar_salas_reconectables(request):
     ).annotate(num_jugadores=Count('jugadores'))
 
     # Devolver salas
-    salas_json = []
-    for p in partidas:
-        jugadores = p.jugadores.all()
-        nombre_jugadores = [j.usuario.nombre for j in jugadores]
-
-        salas_json.append({
-            'id': p.id,
-            'nombre': f'Sala {p.id}',
-            'capacidad': p.capacidad,
-            'num_jugadores': p.num_jugadores,
-            'jugadores': nombre_jugadores
-        })
+    salas_json = [
+        construir_sala_json(p)
+    for p in partidas]
 
     return JsonResponse({'salas': salas_json}, status=200)
 
@@ -104,18 +89,9 @@ def listar_salas_pausadas(request):
     ).annotate(num_jugadores=Count('jugadores'))
 
     # Devolver salas
-    salas_json = []
-    for p in partidas:
-        jugadores = p.jugadores.all()
-        nombre_jugadores = [j.usuario.nombre for j in jugadores]
-
-        salas_json.append({
-            'id': p.id,
-            'nombre': f'Sala {p.id}',
-            'capacidad': p.capacidad,
-            'num_jugadores': p.num_jugadores,
-            'jugadores': nombre_jugadores
-        })
+    salas_json = [
+        construir_sala_json(p)
+    for p in partidas]
 
     return JsonResponse({'salas': salas_json}, status=200)
 
@@ -147,19 +123,34 @@ def listar_salas_amigos(request):
     ).distinct()
 
     # Listar salas
-    salas_json = []
-    for p in partidas:
-        jugadores = p.jugadores.all()
-        amigos_en_sala = [j.usuario.nombre for j in jugadores if j.usuario in amigos]
-        resto_en_sala  = [j.usuario.nombre for j in jugadores if j.usuario not in amigos]
-
-        salas_json.append({
-            'id': p.id,
-            'nombre': f'Sala {p.id}',
-            'capacidad': p.capacidad,
-            'num_jugadores': p.num_jugadores,
-            'amigos': amigos_en_sala,
-            'resto': resto_en_sala
-        })
+    salas_json = [
+        construir_sala_json(p)
+    for p in partidas]
 
     return JsonResponse({'salas': salas_json}, status=200)
+
+def construir_sala_json(partida: Partida, amigos=None):
+    """
+    Te devuelve la información de una sala en formato JSON
+    Añade información extra si la partida es personalizada
+    """
+    jugadores = partida.jugadores.all()
+    nombre_jugadores = [j.usuario.nombre for j in jugadores]
+
+    sala = {
+        'id': partida.id,
+        'nombre': f'Sala {partida.id}',
+        'capacidad': partida.capacidad,
+        'num_jugadores': partida.num_jugadores,
+        'jugadores': nombre_jugadores
+    }
+
+    if partida.es_personalizada:
+        sala['personalizacion'] = {
+            'tiempo_turno': partida.tiempo_turno,
+            'reglas_arrastre': partida.reglas_arrastre,
+            'permitir_revueltas': partida.permitir_revueltas,
+            'solo_amigos': partida.solo_amigos
+        }
+    
+    return sala

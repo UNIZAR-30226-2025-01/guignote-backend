@@ -1,11 +1,12 @@
 
-from partidas.game.consumers import PartidaConsumer
 from channels.testing import WebsocketCommunicator
+from channels.db import database_sync_to_async
 from django.test import TransactionTestCase
 from sotacaballorey.asgi import application
 from utils.jwt_auth import generar_token
 from asgiref.sync import async_to_sync
 from usuarios.models import Usuario
+from partidas.models import Partida
 import json
 
 class PartidaConsumerTest(TransactionTestCase):
@@ -13,7 +14,6 @@ class PartidaConsumerTest(TransactionTestCase):
     reset_sequences = True
 
     def setUp(self):
-        PartidaConsumer.TIEMPO_TURNO = 5
         self.user1 = Usuario.objects.create(
             nombre='Usuario 1', correo='user1@gmail.com', contrasegna='123')
         self.user2 = Usuario.objects.create(
@@ -42,6 +42,9 @@ class PartidaConsumerTest(TransactionTestCase):
             comm2 = WebsocketCommunicator(application, url2)
             connected2, _ = await comm2.connect()
             self.assertTrue(connected2)
+
+            partida_id = data['data']['partida_id']
+            await database_sync_to_async(lambda: Partida.objects.filter(id=partida_id).update(tiempo_turno=5))()
 
             # El usuario 1 y 2 reciben "player_joined" con la info del jugador 2
             msg = await comm1.receive_from(timeout=5)

@@ -28,10 +28,18 @@ class Partida(models.Model):
         default=0, validators=[MinValueValidator(0)]
     )
     estado_json = models.JSONField(default=dict, blank=True)
-    solo_amigos = models.BooleanField(default=False)
     es_revueltas = models.BooleanField(default=False)
     cantos_realizados = models.JSONField(default=dict)
     jugadores_pausa = models.JSONField(default=list)
+    # Campos para personalización de partidas
+    solo_amigos = models.BooleanField(default=False)
+    tiempo_turno = models.IntegerField(
+        choices=[(15, 'Bajo'), (30, 'Normal'), (60, 'Largo')],
+        default=30
+    )
+    permitir_revueltas = models.BooleanField(default=True)
+    reglas_arrastre = models.BooleanField(default=True)
+    es_personalizada = models.BooleanField(default=False)
 
     def __str__(self):
         return f'Partida {self.id} - {self.capacidad} jugadores ({self.estado})'

@@ -1,3 +1,4 @@
+from partidas.elo import calcular_nuevo_elo, calcular_nuevo_elo_parejas
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
 from partidas.models import Partida, JugadorPartida
@@ -6,17 +7,16 @@ from usuarios.models import Usuario
 from datetime import datetime
 from .messages import *
 from .utils import *
+import urllib.parse
 import asyncio
 import random
 import json
-from partidas.elo import calcular_nuevo_elo, calcular_nuevo_elo_parejas
 
 class PartidaConsumer(AsyncWebsocketConsumer):
     """
     Consumer que maneja la lógica de partidas de guiñote.
     """
 
-    TIEMPO_TURNO = 15 # en segundos
     palos = ['Oros', 'Copas', 'Espadas', 'Bastos']
     timer_task = None
 
@@ -26,31 +26,44 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
         
-        # Obtener parámetros
+        # Obtener y parsear parámetros de la URL
         query_params = self.scope['query_string'].decode()
-        import urllib.parse
         params = urllib.parse.parse_qs(query_params)
 
-        solo_amigos_str = params.get('solo_amigos', ['false'])[0]
-        solo_amigos = solo_amigos_str.lower() == 'true'
-
         id_partida_str = params.get('id_partida', [None])[0]
+        es_personalizada = params.get('es_personalizada', ['false'])[0].lower() == 'true'
+        try:
+            self.capacidad = int(params.get('capacidad', 2))
+            self.capacidad = 2 if self.capacidad not in [2,4] else self.capacidad
+        except Exception:
+            self.capacidad = 2
+
+        # Manejar conexión a partida existente por ID
         if id_partida_str:
             self.partida = await obtener_partida_por_id(id_partida_str)
             if not self.partida:
                 await self.close()
                 return
+            
+            if self.partida.solo_amigos and \
+                not await tiene_amigos_en_partida(self.partida, self.usuario):
+                    await self.close()
+                    return
+        # Crear o unise a partida
         else:
-            capacidad_str: str = params.get('capacidad', [None])[0]
-            if capacidad_str not in ['2', '4']:
-                await self.close()
-                return
-            self.partida: Partida = await obtener_o_crear_partida(self.usuario, int(capacidad_str), solo_amigos)
+            if es_personalizada:
+                self.partida = await obtener_o_crear_partida_personalizada(self.usuario, params)
+                
+                if self.partida.solo_amigos and \
+                    not await tiene_amigos_en_partida(self.partida, self.usuario):
+                        await self.close()
+                        return
+            else:
+                self.partida = await obtener_o_crear_partida(self.usuario, self.capacidad)
 
         if not self.partida:
             await self.close()
             return
-        self.capacidad = self.partida.capacidad
 
         # Definimos nombre del grupo
         self.room_group_name = f'partida_{self.partida.id}'
@@ -62,7 +75,6 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         jugador, created = await agregar_jugador(self.partida, self.usuario)
 
         if not jugador:
-            await send_error(self.send, 'No puedes unirte a la partida')
             await self.close()
             return
 
@@ -309,7 +321,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         Si expira el tiempo, juega carta válida aleatoria
         """
         inicio = datetime.now()
-        while(datetime.now() - inicio).total_seconds() < self.TIEMPO_TURNO:
+        while(datetime.now() - inicio).total_seconds() < self.partida.tiempo_turno:
             await asyncio.sleep(1)
             self.partida = await refresh(self.partida)
             if self.partida.estado_json['turno_actual_id'] != jugador_turno.id:
@@ -454,7 +466,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         juego o si se está en arrastre o no
         """
         # Si no estamos en arrastre, cualquier carta es válida
-        if not estado_json.get('fase_arrastre'):
+        if not estado_json.get('fase_arrastre') or not self.partida.reglas_arrastre:
             return mano
         
         # Si la baza está vacía, puedes tirar lo que quieras
@@ -596,6 +608,9 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
     async def verificar_fase_arrastre(self):
         """Activa fase de arrastre si no quedan cartas en el mazo central y asigna la carta de triunfo al perdedor"""
+        if not self.partida.reglas_arrastre:
+            return
+
         estado_json = self.partida.estado_json
         baraja = estado_json.get('baraja', [])
 
@@ -675,9 +690,11 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         elif e2 > 100:
             # Si un equipo supera 100, gana ese equipo
             ganador = 2
-        else:
+        elif self.partida.permitir_revueltas:
             await self.iniciar_revueltas()
             return
+        else:
+            ganador = 0
 
         await actualizar_estadisticas(self.partida, ganador)
 

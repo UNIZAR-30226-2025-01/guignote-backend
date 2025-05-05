@@ -31,7 +31,7 @@ class TestPauseFunctionality(TransactionTestCase):
 
     async def create_websocket_connection(self, token, capacidad=2, solo_amigos=False):
         """Helper function to create a WebSocket connection"""
-        url = f'/ws/partida/?token={token}&capacidad={capacidad}&solo_amigos={str(solo_amigos).lower()}'
+        url = f'/ws/partida/?token={token}&capacidad={capacidad}&es_personalizada={solo_amigos}&solo_amigos={str(solo_amigos).lower()}'
         comm = WebsocketCommunicator(application, url)
         connected, _ = await comm.connect()
         self.assertTrue(connected)
