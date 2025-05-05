@@ -49,9 +49,6 @@ config/settings_local.py
 # Configuración de Docker
 logs/
 *.log
-docker-compose.yml
-Dockerfile.postgres
-Dockerfile
 *.pid
 
 # Configuración de base de datos y migraciones temporales

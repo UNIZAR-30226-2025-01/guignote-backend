@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:latest
+    container_name: postgres_container
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=contrasenya
+      - POSTGRES_DB=Database
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - my_network
+    restart: always
+
+  redis:
+    image: redis:alpine
+    container_name: redis_container
+    command: redis-server --bind 0.0.0.0 --appendonly yes --save 60 1
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - my_network
+    restart: always
+
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile.despliegue
+    container_name: django_container
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=contrasenya
+      - POSTGRES_DB=Database
+      - DJANGO_SECRET_KEY=superclave_segura
+      - DJANGO_DEBUG=True
+      - REDIS_HOST=redis_container
+      - REDIS_PORT=6379
+      - DJANGO_SETTINGS_MODULE=sotacaballorey.settings
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    networks:
+      - my_network
+    restart: always
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  my_network:
+    driver: bridge
