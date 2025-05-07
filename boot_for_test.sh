@@ -1,3 +1,3 @@
 #! /bin/bash
 ./run.sh
-docker exec -it django_container /bin/sh
+docker exec -it django_container /bin/bash

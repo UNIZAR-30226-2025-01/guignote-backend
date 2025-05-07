@@ -3,6 +3,9 @@ FROM python:3.13-alpine
 # Directorio de trabajo
 WORKDIR /sotacaballorey
 
+# Bash
+RUN apk add --no-cache bash
+
 # Copiar requirements.txt
 COPY requirements.txt .
 
