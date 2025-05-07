@@ -109,7 +109,6 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             except Exception as e:
                 print(f"Error al guardar el jugador: {e}")
 
-            #print(f"Jugador {self.usuario.nombre} se ha unido a la partida {self.partida.id}")
             await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PLAYER_JOINED, data={
                 'message': f'{self.usuario.nombre} se ha unido a la partida.',
                 'usuario': {
@@ -131,7 +130,6 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     #------------------------------------------------------------------------------------
 
     async def disconnect(self, code):
-        #print(f"DEBUG: Disconnect called")
         if hasattr(self, 'partida') and self.partida and self.usuario:
             self.partida = await refresh(self.partida)
             jugador: JugadorPartida = await get_jugador(self.partida, self.usuario)

@@ -586,13 +586,12 @@ class TestPauseFunctionality2v2(TransactionTestCase):
                 await comm.disconnect()
 
 
-            # Reconnect all users
-            for user, token in [(self.user1, self.token1), (self.user2, self.token2), 
-                              (self.user3, self.token3), (self.user4, self.token4)]:
-                url = f'/ws/partida/?token={token}&id_partida={match_id}&capacidad=4'
-                comm = WebsocketCommunicator(application, url)
-                connected, _ = await comm.connect()
-                self.assertTrue(connected)
+
+            url1 = f'/ws/partida/?token={self.token1}&id_partida={match_id}&capacidad=4'
+            comm1 = WebsocketCommunicator(application, url1)
+            connected1, _ = await comm1.connect()
+            self.assertTrue(connected1)
+
 
 
             # El usuario 1 recibe mensaje "player_joined" con su info
@@ -600,6 +599,11 @@ class TestPauseFunctionality2v2(TransactionTestCase):
             data = json.loads(msg)
             self.assertTrue(data['type'], 'player_joined')
             self.assertTrue(data['data']['usuario']['id'], self.user1.id)
+
+            url2 = f'/ws/partida/?token={self.token2}&id_partida={match_id}&capacidad=4'
+            comm2 = WebsocketCommunicator(application, url2)
+            connected2, _ = await comm2.connect()
+            self.assertTrue(connected2)
             
             # All users receive player_joined messages
             for comm in [comm1, comm2]:
@@ -607,11 +611,22 @@ class TestPauseFunctionality2v2(TransactionTestCase):
                 data = json.loads(msg)
                 self.assertEqual(data['type'], 'player_joined')
 
+            url3 = f'/ws/partida/?token={self.token3}&id_partida={match_id}&capacidad=4'
+            comm3 = WebsocketCommunicator(application, url3)
+            connected3, _ = await comm3.connect()
+            self.assertTrue(connected3)
+
             # All users receive player_joined messages
             for comm in [comm1, comm2, comm3]:
                 msg = await comm.receive_from(timeout=5)
                 data = json.loads(msg)
                 self.assertEqual(data['type'], 'player_joined')
+
+
+            url4 = f'/ws/partida/?token={self.token4}&id_partida={match_id}&capacidad=4'
+            comm4 = WebsocketCommunicator(application, url4)
+            connected4, _ = await comm4.connect()
+            self.assertTrue(connected4)
 
             # All users receive player_joined messages
             for comm in [comm1, comm2, comm3, comm4]:
