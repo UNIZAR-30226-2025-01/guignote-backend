@@ -21,6 +21,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
     timer_task = None
 
     async def connect(self):
+
         self.usuario: Usuario = self.scope.get('usuario', None)
         if not self.usuario or isinstance(self.usuario, AnonymousUser):
             await self.close()
@@ -33,22 +34,35 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         id_partida_str = params.get('id_partida', [None])[0]
         es_personalizada = params.get('es_personalizada', ['false'])[0].lower() == 'true'
         try:
-            self.capacidad = int(params.get('capacidad', 2))
+            capacidad_value = params.get('capacidad', 2)
+            if isinstance(capacidad_value, list):
+                capacidad_value = str(capacidad_value[0])
+            else:
+                capacidad_value = str(capacidad_value)
+            self.capacidad = int(capacidad_value)
             self.capacidad = 2 if self.capacidad not in [2,4] else self.capacidad
-        except Exception:
+        except Exception as e:
+            print("Exception caught:", e)
             self.capacidad = 2
-
+        
         # Manejar conexión a partida existente por ID
         if id_partida_str:
             self.partida = await obtener_partida_por_id(id_partida_str)
+
             if not self.partida:
                 await self.close()
                 return
             
+            if self.partida.capacidad != self.capacidad:
+                print(f"Error: La partida solicitada no es del tipo correcto (error de capacidad)")
+                await self.close()
+                return
+
             if self.partida.solo_amigos and \
                 not await tiene_amigos_en_partida(self.partida, self.usuario):
                     await self.close()
                     return
+
         # Crear o unise a partida
         else:
             if es_personalizada:
@@ -62,6 +76,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 self.partida = await obtener_o_crear_partida(self.usuario, self.capacidad)
 
         if not self.partida:
+            print(f"error not partida")
             await self.close()
             return
 
@@ -71,10 +86,11 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         # Entramos al grupo y agregamos al jugador a la partida
         await self.channel_layer.group_add(
             self.room_group_name, self.channel_name)
-        
+
         jugador, created = await agregar_jugador(self.partida, self.usuario)
 
         if not jugador:
+            print(f"error not jugador")
             await self.close()
             return
 
@@ -83,9 +99,11 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         if jugador:
             jugador.channel_name = self.channel_name
             jugador.conectado = True
-            await db_sync_to_async_save(jugador)
+            try:
+                await db_sync_to_async_save(jugador)
+            except Exception as e:
+                print(f"Error al guardar el jugador: {e}")
 
-        if created or self.partida.estado == 'pausada':
             await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PLAYER_JOINED, data={
                 'message': f'{self.usuario.nombre} se ha unido a la partida.',
                 'usuario': {
@@ -96,8 +114,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 'partida_id': self.partida.id,
                 'capacidad': self.capacidad,
                 'jugadores': await contar_jugadores(self.partida)
-            })
-
+            })      
 
         if self.partida.estado == 'jugando':
             await send_estado_jugadores(self, MessageTypes.START_GAME, solo_jugador=jugador)
@@ -116,6 +133,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     # pero no lo eliminamos de la partida
                     jugador.conectado = False
                     await db_sync_to_async_save(jugador)
+
 
                     if self.partida.estado == 'jugando' and str(jugador.id) not in self.partida.jugadores_pausa:
                         await self.procesar_pausa()
@@ -184,6 +202,8 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 })
             
             estado = {
+                'solo_amigos': self.partida.solo_amigos,
+                'capacidad':self.capacidad,
                 'partida': self.partida.estado_json,
                 'jugadores': jugadores_data,
                 'mazo': self.partida.estado_json.get('baraja', []),
@@ -255,7 +275,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         Baraja y reparte, define el palo que será el triunfo y
         guarda el estado_json de la partida
         """
-
+        
         # Crear baraja, barajar y definir palo que será el triunfo
         baraja = self.crear_baraja()
         random.shuffle(baraja)
@@ -696,59 +716,60 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         else:
             ganador = 0
 
-        await actualizar_estadisticas(self.partida, ganador)
-
-        # Get all players
         jugadores = await get_jugadores(self.partida)
-        equipo1 = [j for j in jugadores if j.equipo == 1]
-        equipo2 = [j for j in jugadores if j.equipo == 2]
-        
-        # Update ELOs
-        if self.capacidad == 2:
-            if not equipo1 or not equipo2:
-                print("Error: Missing team members for 1v1 game")
-                return
-                
-            # 1v1 game
-            jugador1 = equipo1[0]
-            jugador2 = equipo2[0]
-            
-            # Get current ELOs
-            elo1 = await sync_to_async(lambda: jugador1.usuario.elo)()
-            elo2 = await sync_to_async(lambda: jugador2.usuario.elo)()
-            
-            # Calculate new ELOs
-            resultado = 1 if ganador == 1 else 0
-            nuevo_elo1, nuevo_elo2 = calcular_nuevo_elo(elo1, elo2, resultado)
+        if not self.partida.es_personalizada:
+            await actualizar_estadisticas(self.partida, ganador)
 
-            # Update ELOs
-            await sync_to_async(lambda: setattr(jugador1.usuario, 'elo', nuevo_elo1))()
-            await sync_to_async(lambda: setattr(jugador2.usuario, 'elo', nuevo_elo2))()
-            await sync_to_async(lambda: jugador1.usuario.save())()
-            await sync_to_async(lambda: jugador2.usuario.save())()
-            
-            # Verify saved ELOs
-            saved_elo1 = await sync_to_async(lambda: jugador1.usuario.elo)()
-            saved_elo2 = await sync_to_async(lambda: jugador2.usuario.elo)()
-            
-        else:
-            # 2v2 game
-            elo_equipo1 = [await sync_to_async(lambda: j.usuario.elo_parejas)() for j in equipo1]
-            elo_equipo2 = [await sync_to_async(lambda: j.usuario.elo_parejas)() for j in equipo2]
-            
-            # Calculate new ELOs
-            resultado = 1 if ganador == 1 else 0
-            nuevo_elo1 = calcular_nuevo_elo_parejas(elo_equipo1, elo_equipo2, resultado)
-            nuevo_elo2 = calcular_nuevo_elo_parejas(elo_equipo2, elo_equipo1, 1 - resultado)
+            # Get team players
+            equipo1 = [j for j in jugadores if j.equipo == 1]
+            equipo2 = [j for j in jugadores if j.equipo == 2]
             
             # Update ELOs
-            for j, nuevo_elo in zip(equipo1, nuevo_elo1):
-                await sync_to_async(lambda: setattr(j.usuario, 'elo_parejas', nuevo_elo))()
-                await sync_to_async(lambda: j.usuario.save())()
-            
-            for j, nuevo_elo in zip(equipo2, nuevo_elo2):
-                await sync_to_async(lambda: setattr(j.usuario, 'elo_parejas', nuevo_elo))()
-                await sync_to_async(lambda: j.usuario.save())()
+            if self.capacidad == 2:
+                if not equipo1 or not equipo2:
+                    print("Error: Missing team members for 1v1 game")
+                    return
+                    
+                # 1v1 game
+                jugador1 = equipo1[0]
+                jugador2 = equipo2[0]
+                
+                # Get current ELOs
+                elo1 = await sync_to_async(lambda: jugador1.usuario.elo)()
+                elo2 = await sync_to_async(lambda: jugador2.usuario.elo)()
+                
+                # Calculate new ELOs
+                resultado = 1 if ganador == 1 else 0
+                nuevo_elo1, nuevo_elo2 = calcular_nuevo_elo(elo1, elo2, resultado)
+
+                # Update ELOs
+                await sync_to_async(lambda: setattr(jugador1.usuario, 'elo', nuevo_elo1))()
+                await sync_to_async(lambda: setattr(jugador2.usuario, 'elo', nuevo_elo2))()
+                await sync_to_async(lambda: jugador1.usuario.save())()
+                await sync_to_async(lambda: jugador2.usuario.save())()
+                
+                # Verify saved ELOs
+                saved_elo1 = await sync_to_async(lambda: jugador1.usuario.elo)()
+                saved_elo2 = await sync_to_async(lambda: jugador2.usuario.elo)()
+                
+            else:
+                # 2v2 game
+                elo_equipo1 = [await sync_to_async(lambda: j.usuario.elo_parejas)() for j in equipo1]
+                elo_equipo2 = [await sync_to_async(lambda: j.usuario.elo_parejas)() for j in equipo2]
+                
+                # Calculate new ELOs
+                resultado = 1 if ganador == 1 else 0
+                nuevo_elo1 = calcular_nuevo_elo_parejas(elo_equipo1, elo_equipo2, resultado)
+                nuevo_elo2 = calcular_nuevo_elo_parejas(elo_equipo2, elo_equipo1, 1 - resultado)
+                
+                # Update ELOs
+                for j, nuevo_elo in zip(equipo1, nuevo_elo1):
+                    await sync_to_async(lambda: setattr(j.usuario, 'elo_parejas', nuevo_elo))()
+                    await sync_to_async(lambda: j.usuario.save())()
+                
+                for j, nuevo_elo in zip(equipo2, nuevo_elo2):
+                    await sync_to_async(lambda: setattr(j.usuario, 'elo_parejas', nuevo_elo))()
+                    await sync_to_async(lambda: j.usuario.save())()
 
         await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.GAME_OVER, {
             'message': "Fin de la partida.",
@@ -756,6 +777,17 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             'puntos_equipo_1': e1,
             'puntos_equipo_2': e2,
         })
+
+        for jugador in jugadores:
+            if jugador:
+                jugador.conectado = False
+                await db_sync_to_async_save(jugador)
+                if jugador.channel_name:
+                    await self.channel_layer.send(jugador.channel_name, {
+                        'type': 'close_connection'
+                    })
+
+        await marcar_como_finalizada(self.partida)
 
     async def iniciar_revueltas(self):
         """Inicia la partida de revueltas"""
@@ -1019,12 +1051,13 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         # Desconectar a los jugadores
         jugadores = await get_jugadores(self.partida)
         for jugador in jugadores:
-            jugador.conectado = False
-            await db_sync_to_async_save(jugador)
-            if jugador.channel_name:
-                await self.channel_layer.send(jugador.channel_name, {
-                    'type': 'close_connection'
-                })
+            if jugador:
+                jugador.conectado = False
+                await db_sync_to_async_save(jugador)
+                if jugador.channel_name:
+                    await self.channel_layer.send(jugador.channel_name, {
+                        'type': 'close_connection'
+                    })
 
     async def close_connection(self, event=None):
         """Cierra la conexión del websocket"""

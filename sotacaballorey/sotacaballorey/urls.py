@@ -11,4 +11,5 @@ urlpatterns = [
     path('chat_partida/', include('chat_partida.urls')),
     path('aspectos/', include('dorso_carta.urls')),
     path('aspectos/', include('aspecto_carta.urls')),
+    path('aspectos/', include('tapete.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

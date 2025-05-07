@@ -1,6 +1,7 @@
 from django.core.validators import MinValueValidator, MaxValueValidator
 from chat_partida.models import Chat_partida
 from usuarios.models import Usuario
+from django.utils import timezone
 from django.db import models
 
 ESTADOS_PARTIDA = [
@@ -40,6 +41,8 @@ class Partida(models.Model):
     permitir_revueltas = models.BooleanField(default=True)
     reglas_arrastre = models.BooleanField(default=True)
     es_personalizada = models.BooleanField(default=False)
+    # Info eliminación
+    fecha_fin = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f'Partida {self.id} - {self.capacidad} jugadores ({self.estado})'
@@ -57,6 +60,12 @@ class Partida(models.Model):
             chat = Chat_partida.objects.create()
             self.chat = chat
         super().save(*args, **kwargs)    
+
+    def marcar_como_finalizada(self):
+        """Marca la partida como finalizada"""
+        self.estado = 'terminada'
+        self.fecha_fin = timezone.now()
+        self.save()
 
     def delete(self, *args, **kwargs):
         """Sobreescribir <delete> para borrar el chat cuando se termine/elimine la partida"""

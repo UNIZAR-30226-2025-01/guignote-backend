@@ -4,6 +4,10 @@ venv/
 __pycache__/
 *.pyc
 
+#Scripts personales
+test_2v2.sh
+clean_docker.sh
+
 # Archivos de configuración de Python
 *.pyo
 *.pyd
