@@ -62,7 +62,12 @@ urlpatterns = [
     # Relacionadas con aspectos
     path('unlock_skin/<int:user_id>/', views_aspectos.unlock_skin, name='unlock_skin'),
     path('unlock_back/<int:user_id>/', views_aspectos.unlock_back, name='unlock_back'),
+    path('unlock_tapete/<int:user_id>/', views_aspectos.unlock_tapete, name='unlock_tapete'),
+    path('equip_skin/<int:user_id>/', views_aspectos.equip_skin, name='equip_skin'),
+    path('equip_back/<int:user_id>/', views_aspectos.equip_back, name='equip_back'),
+    path('equip_tapete/<int:user_id>/', views_aspectos.equip_tapete, name='equip_tapete'),
     path('get_unlocked_items/<int:user_id>/', views_aspectos.get_unlocked_items, name='get_unlocked_items'),
+    path('get_equipped_items/<int:user_id>/', views_aspectos.get_equipped_items, name='get_equipped_items'),
     
     #######################################################################################################################################
 ]

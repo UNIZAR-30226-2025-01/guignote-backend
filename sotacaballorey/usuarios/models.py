@@ -2,10 +2,17 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from aspecto_carta.models import CardSkin
 from dorso_carta.models import CardBack
+from tapete.models import Tapete
 
 class Usuario(models.Model):
     unlocked_skins = models.ManyToManyField(CardSkin, related_name='players', blank=True)
     unlocked_backs = models.ManyToManyField(CardBack, related_name='players', blank=True)
+    unlocked_tapetes = models.ManyToManyField(Tapete, related_name='players', blank=True)
+    
+    equipped_skin = models.ForeignKey(CardSkin, on_delete=models.SET_NULL, null=True, blank=True, related_name='equipped_by')
+    equipped_back = models.ForeignKey(CardBack, on_delete=models.SET_NULL, null=True, blank=True, related_name='equipped_by')
+    equipped_tapete = models.ForeignKey(Tapete, on_delete=models.SET_NULL, null=True, blank=True, related_name='equipped_by')
+    
     nombre = models.CharField\
         (max_length=64,  blank=False, null=False, unique=True)
     correo = models.EmailField\
