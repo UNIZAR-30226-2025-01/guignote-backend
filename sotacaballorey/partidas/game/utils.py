@@ -181,16 +181,25 @@ def _crear_partida_personalizada(
 def _obtener_config_personalizada(params: dict):
     """Leer parámetros de la URL de conexión a una partida personalizada"""
     try:
-        capacidad = int(params.get('capacidad', 2))
-        capacidad = 2 if capacidad not in [2,4] else capacidad
-    except Exception:
+        capacidad_value = params.get('capacidad', 2)
+        if isinstance(capacidad_value, list):
+            capacidad_value = str(capacidad_value[0])
+        else:
+            capacidad_value = str(capacidad_value)
+        capacidad = 2 if int(capacidad_value) not in [2,4] else int(capacidad_value)
+    except Exception as e:
+        print(f"Error al obtener la capacidad: {e}")
         capacidad = 2
     
     try:
-        tiempo_turno = int(params.get('tiempo_turno', 30))
-        if tiempo_turno not in [15, 30, 60]:
-            tiempo_turno = 30
-    except:
+        tiempo_turno_value = params.get('tiempo_turno', 30)
+        if isinstance(tiempo_turno_value, list):
+            tiempo_turno_value = str(tiempo_turno_value[0])
+        else:
+            tiempo_turno_value = str(tiempo_turno_value)
+        tiempo_turno = 30 if int(tiempo_turno_value) not in [15, 30, 60] else int(tiempo_turno_value)
+    except Exception as e:
+        print(f"Error al obtener el tiempo de turno: {e}")
         tiempo_turno = 30
 
     solo_amigos = params.get('solo_amigos', ['false'])[0].lower() == 'true'
