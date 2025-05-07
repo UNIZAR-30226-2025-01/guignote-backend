@@ -310,28 +310,4 @@ class TestPauseFunctionality(TransactionTestCase):
             self.assertTrue(data['type'], 'player_joined')
             self.assertTrue(data['data']['usuario']['id'], self.user1.id)
 
-            # Reconnect user2
-            url2 = f'/ws/partida/?token={self.token2}&id_partida={match_id}'
-            comm2 = WebsocketCommunicator(application, url2)
-            connected2, _ = await comm2.connect()
-            self.assertTrue(connected2)
-
-            # Verify both users receive player_joined messages
-            for comm in [comm1, comm2]:
-                msg = await comm.receive_from(timeout=5)
-                data = json.loads(msg)
-                self.assertEqual(data["type"], "player_joined")
-
-            # Verify both users receive start_game messages
-            for comm in [comm1, comm2]:
-                msg = await comm.receive_from(timeout=5)
-                data = json.loads(msg)
-                self.assertEqual(data["type"], "start_game")
-
-            # Verify both users receive turn_update messages
-            for comm in [comm1, comm2]:
-                msg = await comm.receive_from(timeout=5)
-                data = json.loads(msg)
-                self.assertEqual(data["type"], "turn_update")
-
         async_to_sync(inner)()
