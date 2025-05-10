@@ -1,0 +1,20 @@
+[
+    {
+        "model": "tapete.tapete",
+        "pk": 1,
+        "fields": {
+            "id": 1,
+            "name": "1",
+            "file_path": "/static/images/tapetes/1.png"
+        }
+    },
+    {
+        "model": "tapete.tapete",
+        "pk": 2,
+        "fields": {
+            "id": 2,
+            "name": "2",
+            "file_path": "/static/images/tapetes/2.png"
+        }
+    }
+]

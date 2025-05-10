@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define app names
-APPS=("usuarios" "partidas" "chat_partida" "chat_global")
+APPS=("usuarios" "partidas" "chat_partida" "chat_global" "aspecto_carta")
 
 # Print header
 echo "====================================="
