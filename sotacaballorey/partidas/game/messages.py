@@ -48,10 +48,10 @@ async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartid
     mazo = estado_json.get('baraja', [])
     fase_arrastre = estado_json.get('fase_arrastre', False)
     carta_triunfo = estado_json.get('carta_triunfo')
-    jugadores = [solo_jugador] if solo_jugador else await get_jugadores(self.partida)
+    todos_jugadores = await get_jugadores(self.partida)
 
     players_info = []
-    for jp in jugadores:
+    for jp in todos_jugadores:
         u = await sync_to_async(lambda: jp.usuario)()
         players_info.append({
             'id': u.id,
@@ -62,7 +62,8 @@ async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartid
 
     chat_id = await obtener_chat_id(self.partida)
 
-    for jp in jugadores:
+    jugadores_a_enviar = [solo_jugador] if solo_jugador else todos_jugadores
+    for jp in jugadores_a_enviar:
         data_para_jugador = {
             'jugadores': players_info,
             'mazo_restante': len(mazo),

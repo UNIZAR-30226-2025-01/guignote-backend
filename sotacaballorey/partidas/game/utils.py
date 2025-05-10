@@ -229,3 +229,8 @@ def obtener_o_crear_partida_personalizada(
         p = _crear_partida_personalizada(
             capacidad, solo_amigos, tiempo_turno, permitir_revueltas, reglas_arrastre)
     return p
+
+@database_sync_to_async
+def marcar_como_finalizada(partida: Partida):
+    """Marcar partida como finalizada"""
+    partida.marcar_como_finalizada()
