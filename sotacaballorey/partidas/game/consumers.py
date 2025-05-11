@@ -628,7 +628,7 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
     async def verificar_fase_arrastre(self):
         """Activa fase de arrastre si no quedan cartas en el mazo central y asigna la carta de triunfo al perdedor"""
-        if not self.partida.reglas_arrastre:
+        if not self.partida.reglas_arrastre or self.partida.estado_json['fase_arrastre']:
             return
 
         estado_json = self.partida.estado_json
