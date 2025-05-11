@@ -634,32 +634,13 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         estado_json = self.partida.estado_json
         baraja = estado_json.get('baraja', [])
 
-        if len(baraja) == 1:
-            baraja.pop()
-            estado_json['baraja'] = baraja
-            # Asignar la carta de triunfo al equipo que perdió la última baza antes de arrastre
-            carta_triunfo = estado_json.get('carta_triunfo')
-            if carta_triunfo:
-                ultimo_ganador_id = estado_json.get('ultimo_ganador')
-                jugadores = await get_jugadores(self.partida)
-                ganador = next((j for j in jugadores if j.id == ultimo_ganador_id), None)
-                if ganador:
-                    equipo_perdedor = 2 if ganador.equipo == 1 else 1
-                    puntos = self.valor_carta(carta_triunfo)
-                    if equipo_perdedor == 1:
-                        self.partida.puntos_equipo_1 += puntos
-                    else:
-                        self.partida.puntos_equipo_2 += puntos
-                    await db_sync_to_async_save(self.partida)
-
+        if len(baraja) == 0:
             estado_json['fase_arrastre'] = True
             self.partida.estado_json = estado_json
             await db_sync_to_async_save(self.partida)
 
             await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PHASE_UPDATE, data={
-                'message': 'La partida entra en fase de arrastre.',
-                'carta_triunfo': carta_triunfo,
-                'equipo_que_gana_triunfo': equipo_perdedor
+                'message': 'La partida entra en fase de arrastre'
             })
 
     #-----------------------------------------------------------------------------------#
