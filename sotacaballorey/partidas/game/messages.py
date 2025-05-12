@@ -50,14 +50,19 @@ async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartid
     carta_triunfo = estado_json.get('carta_triunfo')
     todos_jugadores = await get_jugadores(self.partida)
 
+    baza_actual = estado_json.get('baza_actual', [])
+    cartas_jugadas = {b['jugador_id']: b['carta'] for b in baza_actual}
+
     players_info = []
     for jp in todos_jugadores:
         u = await sync_to_async(lambda: jp.usuario)()
+        carta_jugada = cartas_jugadas.get(jp.id, None)
         players_info.append({
             'id': u.id,
             'nombre': u.nombre,
             'equipo': jp.equipo,
-            'num_cartas': len(jp.cartas_json)
+            'num_cartas': len(jp.cartas_json),
+            'carta_jugada': carta_jugada
         })
 
     chat_id = await obtener_chat_id(self.partida)

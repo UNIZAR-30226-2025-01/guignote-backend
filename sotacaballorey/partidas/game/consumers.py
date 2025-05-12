@@ -80,6 +80,14 @@ class PartidaConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
+        jugador_existente = await get_jugador(self.partida, self.usuario)
+        if jugador_existente:
+            if jugador_existente.channel_name:
+                # Si el jugador ya está conectado en otro canal, cerramos esa conexión
+                await self.channel_layer.send(jugador_existente.channel_name, {
+                    'type': 'close_connection'
+                })
+
         # Definimos nombre del grupo
         self.room_group_name = f'partida_{self.partida.id}'
 
