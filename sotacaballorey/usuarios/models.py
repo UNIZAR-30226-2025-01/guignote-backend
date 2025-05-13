@@ -72,10 +72,11 @@ class Usuario(models.Model):
         # Only add if not already unlocked
         if default_skin not in self.unlocked_skins.all():
             self.unlocked_skins.add(default_skin)
+            self.equipped_skin = default_skin
 
         if default_tapete not in self.unlocked_tapetes.all():
             self.unlocked_tapetes.add(default_tapete)
-
+            self.equipped_tapete = default_tapete
 
         # Unlock Poker Skin for "Parroquiano"
         if self.elo_rank == 'casual' or self.elo_rank == 'parroquiano' or self.elo_rank == 'octogenario' or self.elo_rank == 'leyenda':
