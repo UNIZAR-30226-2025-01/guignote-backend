@@ -361,10 +361,23 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         inicio = datetime.now()
         while(datetime.now() - inicio).total_seconds() < self.partida.tiempo_turno:
             await asyncio.sleep(1)
-            self.partida = await refresh(self.partida)
-            if self.partida.estado_json['turno_actual_id'] != jugador_turno.id:
+
+            try:
+                self.partida = await refresh(self.partida)
+            except Partida.DoesNotExist:
                 return
-        await self.jugar_carta_automatica(jugador_turno)
+
+            if self.partida.estado != 'jugando':
+                return
+
+            estado_json = self.partida.estado_json or {}
+
+            turno_actual_id = estado_json.get('turno_actual_id')
+            if turno_actual_id is None or turno_actual_id != jugador_turno.id:
+                return
+            
+        if self.partida.estado == 'jugando':
+            await self.jugar_carta_automatica(jugador_turno)
 
     async def jugar_carta_automatica(self, jugador: JugadorPartida):
         """
@@ -1054,6 +1067,9 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         self.partida.estado = 'pausada'
         await db_sync_to_async_save(self.partida)
         
+        if self.timer_task and not self.timer_task.done():
+            self.timer_task.cancel()
+
         await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.ALL_PAUSE, {
             'message': 'La partida ha sido pausada por acuerdo de todos los jugadores.'
         })
