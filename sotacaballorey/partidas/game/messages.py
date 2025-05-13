@@ -53,6 +53,10 @@ async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartid
     baza_actual = estado_json.get('baza_actual', [])
     cartas_jugadas = {b['jugador_id']: b['carta'] for b in baza_actual}
 
+    turno_id = self.partida.estado_json['turno_actual_id']
+    jugador_turno: JugadorPartida = await get_jugador_by_id(turno_id)
+    usuario: Usuario = await sync_to_async(lambda: jugador_turno.usuario)()
+
     players_info = []
     for jp in todos_jugadores:
         u = await sync_to_async(lambda: jp.usuario)()
@@ -80,6 +84,7 @@ async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartid
             'puntos_equipo_1': self.partida.puntos_equipo_1,
             'puntos_equipo_2': self.partida.puntos_equipo_2,
             'pausados': len(self.partida.jugadores_pausa or []),
+            'turno': usuario.id,
         }
         if jp.channel_name:
             await self.channel_layer.send(jp.channel_name, {
