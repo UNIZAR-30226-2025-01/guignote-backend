@@ -1,0 +1,26 @@
+[
+    {
+        "model": "usuarios.usuario",
+        "pk": 1,
+        "fields": {
+            "nombre": "admin",
+            "correo": "admin@example.com",
+            "contrasegna": "pbkdf2_sha256$1000000$qsJ2N7hbwTFZtmKyKceS7W$hzIh78fjHRrDNEFtbbHyr5vamzmgo66Wt891XcLu9Uc=",
+            "elo": 3000,
+            "elo_parejas": 3000,
+            "elo_rank": "leyenda",
+            "victorias": 0,
+            "derrotas": 0,
+            "racha_victorias": 0,
+            "mayor_racha_victorias": 0,
+            "imagen": null,
+            "amigos": [],
+            "unlocked_skins": [],
+            "unlocked_backs": [],
+            "unlocked_tapetes": [],
+            "equipped_skin": null,
+            "equipped_back": null,
+            "equipped_tapete": null
+        }
+    }
+]

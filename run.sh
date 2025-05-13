@@ -22,5 +22,6 @@ done
 echo "Loading initial data..."
 docker exec -it django_container python manage.py loaddata --verbosity 2 --app aspecto_carta initial_data.json
 docker exec -it django_container python manage.py loaddata --verbosity 2 --app tapete initial_data.json
+docker exec -it django_container python manage.py loaddata --verbosity 2 --app usuarios initial_data.json
 
 
