@@ -7,22 +7,38 @@ from django.contrib.auth.hashers import make_password
 # Lista de usuarios a crear
 nombres_usuarios = [
     "Julia", "Julio", "Julito", "María", "Marta", "Marcelo", "Mario", "Marcos",
-    "Adrían", "Adriana", "Jorge", "Diego", "Oscar", "Javier"
+    "Adrían", "Adriana", "Jorge", "Diego", "Oscar", "Javier", "José", "Alberto", "Alejandro",
+    "Guiri", "Casual", "Octogenario", "Leyenda", "Parroquiano"
 ]
 
 # Función para crear usuarios
 def crear_usuarios():
+    elo_personalizado = {
+            "Guiri": 1000,
+            "Casual": 1400,
+            "Parroquiano": 1800,
+            "Octogenario": 2400,
+            "Leyenda": 3000
+    }
     usuarios = {
-        usuario.id: usuario
+        usuario.nombre: usuario
         for usuario in Usuario.objects.bulk_create([
             Usuario(
                 nombre=nombre,
                 correo=f'{nombre.lower()}@ejemplo.com',
-                contrasegna=make_password('123')
+                contrasegna=make_password('123'),
+                elo=1200
             )
             for nombre in nombres_usuarios
         ])
     }
+    
+    for nombre, elo in elo_personalizado.items():
+        user = usuarios.get(nombre)
+        if user:
+            user.elo = elo
+            user.save()
+
     return usuarios
 
 # Función para crear solicitudes de amistad
