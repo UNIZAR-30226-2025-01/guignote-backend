@@ -317,5 +317,6 @@ class TestPauseFunctionality(TransactionTestCase):
             data = json.loads(msg)
             self.assertTrue(data['type'], 'player_joined')
             self.assertTrue(data['data']['usuario']['id'], self.user1.id)
+            self.assertTrue(data['data']['pausados'], 1)
 
         async_to_sync(inner)()

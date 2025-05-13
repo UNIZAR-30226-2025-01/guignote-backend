@@ -593,31 +593,31 @@ class TestPauseFunctionality2v2(TransactionTestCase):
             for comm in [comm1, comm2, comm3, comm4]:
                 await comm.disconnect()
 
-
-
             url1 = f'/ws/partida/?token={self.token1}&id_partida={match_id}&capacidad=4'
             comm1 = WebsocketCommunicator(application, url1)
             connected1, _ = await comm1.connect()
             self.assertTrue(connected1)
-
-
 
             # El usuario 1 recibe mensaje "player_joined" con su info
             msg = await comm1.receive_from(timeout=5)
             data = json.loads(msg)
             self.assertTrue(data['type'], 'player_joined')
             self.assertTrue(data['data']['usuario']['id'], self.user1.id)
+            self.assertTrue(data['data']['pausados'], 3)
+
 
             url2 = f'/ws/partida/?token={self.token2}&id_partida={match_id}&capacidad=4'
             comm2 = WebsocketCommunicator(application, url2)
             connected2, _ = await comm2.connect()
             self.assertTrue(connected2)
-            
+  
             # All users receive player_joined messages
             for comm in [comm1, comm2]:
                 msg = await comm.receive_from(timeout=5)
                 data = json.loads(msg)
                 self.assertEqual(data['type'], 'player_joined')
+                self.assertTrue(data['data']['pausados'], 2)
+
 
             url3 = f'/ws/partida/?token={self.token3}&id_partida={match_id}&capacidad=4'
             comm3 = WebsocketCommunicator(application, url3)
@@ -629,6 +629,7 @@ class TestPauseFunctionality2v2(TransactionTestCase):
                 msg = await comm.receive_from(timeout=5)
                 data = json.loads(msg)
                 self.assertEqual(data['type'], 'player_joined')
+                self.assertTrue(data['data']['pausados'], 1)
 
 
             url4 = f'/ws/partida/?token={self.token4}&id_partida={match_id}&capacidad=4'
@@ -641,6 +642,7 @@ class TestPauseFunctionality2v2(TransactionTestCase):
                 msg = await comm.receive_from(timeout=5)
                 data = json.loads(msg)
                 self.assertEqual(data['type'], 'player_joined')
+                self.assertEqual(data['data']['pausados'], 0)
 
             # Verify all users receive start_game messages
             for comm in [comm1, comm2, comm3, comm4]:

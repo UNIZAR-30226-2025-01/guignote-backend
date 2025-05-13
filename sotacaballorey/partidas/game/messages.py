@@ -77,6 +77,9 @@ async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartid
             'carta_triunfo': carta_triunfo,
             'chat_id': chat_id,
             'tiempo_turno': self.partida.tiempo_turno,
+            'puntos_equipo_1': self.partida.puntos_equipo_1,
+            'puntos_equipo_2': self.partida.puntos_equipo_2,
+            'pausados': len(self.partida.jugadores_pausa or []),
         }
         if jp.channel_name:
             await self.channel_layer.send(jp.channel_name, {
