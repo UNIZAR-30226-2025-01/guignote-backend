@@ -53,10 +53,16 @@ async def send_estado_jugadores(self, msg_type: str, solo_jugador: JugadorPartid
     baza_actual = estado_json.get('baza_actual', [])
     cartas_jugadas = {b['jugador_id']: b['carta'] for b in baza_actual}
 
-    turno_id = self.partida.estado_json['turno_actual_id']
-    jugador_turno: JugadorPartida = await get_jugador_by_id(turno_id)
-    usuario: Usuario = await sync_to_async(lambda: jugador_turno.usuario)()
-
+    usuario = None
+    try:
+        turno_id = self.partida.estado_json.get('turno_actual_id')
+        if isinstance(turno_id, int):
+            jugador_turno = await get_jugador_by_id(turno_id)
+            if jugador_turno:
+                usuario = await sync_to_async(lambda: jugador_turno.usuario)()
+    except Exception as e:
+        print(f"Error: {e}")
+        
     players_info = []
     for jp in todos_jugadores:
         u = await sync_to_async(lambda: jp.usuario)()
