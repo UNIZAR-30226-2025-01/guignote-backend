@@ -57,11 +57,14 @@ def get_jugadores(partida: Partida):
 @database_sync_to_async
 def contar_jugadores(partida: Partida):
     """Devuelve el número de jugadores en la partida"""
-    partida.refresh_from_db()
-    jugadores = JugadorPartida.objects.filter(partida=partida)
-    for jugador in jugadores:
-        jugador.refresh_from_db()
-    return jugadores.filter(conectado=True).count()
+    try:
+        partida.refresh_from_db()
+        if not partida.pk:
+            return 0
+        jugadores = JugadorPartida.objects.filter(partida=partida)
+        return jugadores.filter(conectado=True).count()
+    except Partida.DoesNotExist:
+        return 0
 
 def _tiene_amigos_en_partida(partida: Partida, usuario: Usuario) -> bool:
     """

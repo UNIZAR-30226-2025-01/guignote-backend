@@ -139,7 +139,12 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, code):
         if hasattr(self, 'partida') and self.partida and self.usuario:
-            self.partida = await refresh(self.partida)
+            try:
+                self.partida = await refresh(self.partida)
+            except Partida.DoesNotExist:
+                if hasattr(self, 'room_group_name') and self.channel_name:
+                    await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+                return
             jugador: JugadorPartida = await get_jugador(self.partida, self.usuario)
             if jugador:
                 if self.partida.estado in ['jugando', 'pausada']:
@@ -161,19 +166,18 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                     count_jugadores = await contar_jugadores(self.partida)
                     if count_jugadores == 0:
                         await db_sync_to_async_delete(self.partida)
-        
-        await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PLAYER_LEFT, data={
-            'message': f'{self.usuario.nombre} se ha desconectado.',
-            'usuario': {
-                'nombre': self.usuario.nombre,
-                'id': self.usuario.id
-            },
-            'capacidad': self.capacidad,
-            'jugadores': await contar_jugadores(self.partida)
-        })
+        if hasattr(self, 'room_group_name') and self.usuario:
+            await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PLAYER_LEFT, data={
+                'message': f'{self.usuario.nombre} se ha desconectado.',
+                'usuario': {
+                    'nombre': self.usuario.nombre,
+                    'id': self.usuario.id
+                },
+                'capacidad': self.capacidad,
+                'jugadores': await contar_jugadores(self.partida)
+            })
 
-        await self.channel_layer.group_discard(
-            self.room_group_name, self.channel_name)
+            await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     #-----------------------------------------------------------------------------------#
     # Recepción de mensajes del front-end / jugadores                                   #
@@ -667,7 +671,10 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         - Si estamos en partida normal, termina solo cuando se vacían las manos y el mazo,
           y un équipo ha superado los 100 puntos.
         """
-        self.partida = await refresh(self.partida)
+        try:
+            self.partida = await refresh(self.partida)
+        except Partida.DoesNotExist:
+            return False
         estado_json = self.partida.estado_json
 
         if self.partida.es_revueltas:
@@ -691,6 +698,11 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         - En partida normal, si ambos superan 100, gana quien hizo las 10 últimas.
         - En revueltas, gana quien supera primero los 100.
         """
+        try:
+            self.partida = await refresh(self.partida)
+        except Partida.DoesNotExist:
+            return
+
         e1 = self.partida.puntos_equipo_1
         e2 = self.partida.puntos_equipo_2
 
@@ -782,7 +794,10 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                         'type': 'close_connection'
                     })
 
-        await marcar_como_finalizada(self.partida)
+        try:
+            await marcar_como_finalizada(self.partida)
+        except Partida.DoesNotExist:
+            return
 
     async def iniciar_revueltas(self):
         """Inicia la partida de revueltas"""
