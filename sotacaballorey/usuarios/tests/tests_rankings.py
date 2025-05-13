@@ -2,9 +2,15 @@ from django.test import TestCase
 from django.urls import reverse
 from usuarios.models import Usuario
 import json
+from django.core.management import call_command
 
 class TopEloTestCase(TestCase):
-
+    fixtures = [
+            'aspecto_carta/fixtures/initial_data.json',
+            'tapete/fixtures/initial_data.json'
+        ]
+    for fixture in fixtures:
+            call_command('loaddata', fixture)
     def test_no_players(self):
         """Test that the response is empty when there are no players."""
         response = self.client.get(reverse('obtener_top_elo'))

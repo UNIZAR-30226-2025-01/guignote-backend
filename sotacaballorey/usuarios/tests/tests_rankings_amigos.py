@@ -2,8 +2,16 @@ from django.test import TestCase
 from django.urls import reverse
 from utils.jwt_auth import generar_token  # Assuming this is the utility to generate tokens
 from usuarios.models import Usuario, SolicitudAmistad
+from django.core.management import call_command
 
 class TestTopEloForFriends(TestCase):
+
+    fixtures = [
+            'aspecto_carta/fixtures/initial_data.json',
+            'tapete/fixtures/initial_data.json'
+        ]
+    for fixture in fixtures:
+            call_command('loaddata', fixture)
 
     def setUp(self):
         """

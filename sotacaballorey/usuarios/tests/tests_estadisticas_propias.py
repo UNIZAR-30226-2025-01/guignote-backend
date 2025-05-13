@@ -4,9 +4,17 @@ from usuarios.models import Usuario
 from partidas.models import Partida
 from utils.jwt_auth import generar_token  # Import JWT authentication utility
 import json
-
+from django.core.management import call_command
 
 class EstadisticasUsuarioTestCase(TestCase):
+
+    fixtures = [
+            'aspecto_carta/fixtures/initial_data.json',
+            'tapete/fixtures/initial_data.json'
+        ]
+    for fixture in fixtures:
+            call_command('loaddata', fixture)
+
 
     def setUp(self):
         """Setup users, matches, and generate authentication tokens."""
@@ -91,8 +99,8 @@ class EstadisticasUsuarioTestCase(TestCase):
             "porcentaje_victorias": round((self.usuario1.victorias / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2),
             "imagen": None,
             "porcentaje_derrotas": round((self.usuario1.derrotas / (self.usuario1.victorias + self.usuario1.derrotas)) * 100, 2),
-            "elo_parejas": 0,
-            "elo": 0
+            "elo_parejas": 1200,
+            "elo": 1200
         }
 
         self.assertEqual(response.json(), expected_data)

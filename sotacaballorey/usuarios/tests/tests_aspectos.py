@@ -5,10 +5,23 @@ from dorso_carta.models import CardBack
 from tapete.models import Tapete
 from usuarios.models import Usuario
 import json
+from django.core.management import call_command
 
 class CardSkinBackTestCase(TestCase):
+
+    fixtures = [
+            'aspecto_carta/fixtures/initial_data.json',
+            'tapete/fixtures/initial_data.json'
+        ]
+    for fixture in fixtures:
+            call_command('loaddata', fixture)
     
     def setUp(self):
+
+        self.current_skins = CardSkin.objects.all().count()
+        self.current_backs = CardBack.objects.all().count()
+        self.current_tapetes = Tapete.objects.all().count()
+
         # Create 3 card skins
         self.skin1 = CardSkin.objects.create(name="Flame Design", file_path="/images/skins/flame.png")
         self.skin2 = CardSkin.objects.create(name="Water Design", file_path="/images/skins/water.png")
@@ -39,13 +52,14 @@ class CardSkinBackTestCase(TestCase):
         self.get_tapete_id_url = reverse('get_tapete_id_from_name')
     
     def test_add_and_unlock_card_skins_backs_and_tapetes(self):
+
         # Test adding and retrieving all card skins
         response = self.client.get(reverse('get_all_card_skins'))
         self.assertEqual(response.status_code, 200)
         
         # Check the skins are in the response
         skins_data = json.loads(response.content)['card_skins']
-        self.assertEqual(len(skins_data), 3)
+        self.assertEqual(len(skins_data), self.current_skins + 3)
         self.assertIn(self.skin1.name, [skin['name'] for skin in skins_data])
         self.assertIn(self.skin2.name, [skin['name'] for skin in skins_data])
         self.assertIn(self.skin3.name, [skin['name'] for skin in skins_data])
@@ -56,7 +70,7 @@ class CardSkinBackTestCase(TestCase):
         
         # Check the backs are in the response
         backs_data = json.loads(response.content)['card_backs']
-        self.assertEqual(len(backs_data), 3)
+        self.assertEqual(len(backs_data), self.current_backs + 3)
         self.assertIn(self.back1.name, [back['name'] for back in backs_data])
         self.assertIn(self.back2.name, [back['name'] for back in backs_data])
         self.assertIn(self.back3.name, [back['name'] for back in backs_data])
@@ -67,10 +81,14 @@ class CardSkinBackTestCase(TestCase):
         
         # Check the tapetes are in the response
         tapetes_data = json.loads(response.content)['tapetes']
-        self.assertEqual(len(tapetes_data), 3)
+        self.assertEqual(len(tapetes_data), self.current_tapetes + 3)
         self.assertIn(self.tapete1.name, [tapete['name'] for tapete in tapetes_data])
         self.assertIn(self.tapete2.name, [tapete['name'] for tapete in tapetes_data])
         self.assertIn(self.tapete3.name, [tapete['name'] for tapete in tapetes_data])
+
+        current_unlocked_skins = self.user.unlocked_skins.all().count()
+        current_unlocked_backs = self.user.unlocked_backs.all().count()
+        current_unlocked_tapetes = self.user.unlocked_tapetes.all().count()
         
         # Unlock 2 skins for the test user
         response = self.client.post(self.unlock_skin_url, json.dumps({"skin_id": self.skin1.id}), content_type="application/json")
@@ -100,35 +118,36 @@ class CardSkinBackTestCase(TestCase):
         unlocked_tapetes = unlocked_data['unlocked_tapetes']
         
         # Check that the unlocked skins are correct
-        self.assertEqual(len(unlocked_skins), 2)
+
+        self.assertEqual(len(unlocked_skins), current_unlocked_skins + 2)
         self.assertIn(self.skin1.name, [skin['name'] for skin in unlocked_skins])
         self.assertIn(self.skin2.name, [skin['name'] for skin in unlocked_skins])
         
         # Check that the unlocked backs are correct
-        self.assertEqual(len(unlocked_backs), 2)
+        self.assertEqual(len(unlocked_backs), current_unlocked_backs + 2)
         self.assertIn(self.back1.name, [back['name'] for back in unlocked_backs])
         self.assertIn(self.back2.name, [back['name'] for back in unlocked_backs])
 
         # Check that the unlocked tapetes are correct
-        self.assertEqual(len(unlocked_tapetes), 2)
+        self.assertEqual(len(unlocked_tapetes), current_unlocked_tapetes + 2)
         self.assertIn(self.tapete1.name, [tapete['name'] for tapete in unlocked_tapetes])
         self.assertIn(self.tapete2.name, [tapete['name'] for tapete in unlocked_tapetes])
         
     def test_get_card_skin_id_from_name(self):
-        # Test retrieving CardSkin ID by name
-        response = self.client.get(self.get_card_skin_id_url, {'name': 'Flame Design'})
-        self.assertEqual(response.status_code, 200)
-        
-        # Check if the response contains the correct ID and name
-        response_data = json.loads(response.content)
-        self.assertEqual(response_data['id'], self.skin1.id)
-        self.assertEqual(response_data['name'], 'Flame Design')
+            # Test retrieving CardSkin ID by name
+            response = self.client.get(self.get_card_skin_id_url, {'name': 'Flame Design'})
+            self.assertEqual(response.status_code, 200)
+            
+            # Check if the response contains the correct ID and name
+            response_data = json.loads(response.content)
+            self.assertEqual(response_data['id'], self.skin1.id)
+            self.assertEqual(response_data['name'], 'Flame Design')
 
-        # Test for a non-existing CardSkin
-        response = self.client.get(self.get_card_skin_id_url, {'name': 'NonExistent Skin'})
-        self.assertEqual(response.status_code, 404)
-        response_data = json.loads(response.content)
-        self.assertEqual(response_data['error'], "CardSkin not found")
+            # Test for a non-existing CardSkin
+            response = self.client.get(self.get_card_skin_id_url, {'name': 'NonExistent Skin'})
+            self.assertEqual(response.status_code, 404)
+            response_data = json.loads(response.content)
+            self.assertEqual(response_data['error'], "CardSkin not found")
 
     def test_get_card_back_id_from_name(self):
         # Test retrieving CardBack ID by name

@@ -8,10 +8,18 @@ from asgiref.sync import async_to_sync
 from usuarios.models import Usuario
 from partidas.models import Partida
 import json
+from django.core.management import call_command
 
 class PartidaConsumerTest(TransactionTestCase):
     
     reset_sequences = True
+
+    fixtures = [
+            'aspecto_carta/fixtures/initial_data.json',
+            'tapete/fixtures/initial_data.json'
+        ]
+    for fixture in fixtures:
+            call_command('loaddata', fixture)
 
     def setUp(self):
         self.user1 = Usuario.objects.create(

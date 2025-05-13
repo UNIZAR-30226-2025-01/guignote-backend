@@ -16,5 +16,14 @@
             "name": "Poker",
             "file_path": "/static/images/cards/poker.png"
         }
+    },
+    {
+        "model": "aspecto_carta.cardskin",
+        "pk": 3,
+        "fields": {
+            "id": 3,
+            "name": "Paint",
+            "file_path": "/static/images/cards/paint.png"
+        }
     }
 ]

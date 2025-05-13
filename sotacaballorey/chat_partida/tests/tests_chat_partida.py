@@ -5,8 +5,17 @@ from partidas.models import Partida, JugadorPartida
 from usuarios.models import Usuario
 from utils.jwt_auth import generar_token
 from django.urls import reverse
+from django.core.management import call_command
 
 class TestChatMessages(TestCase):
+
+    fixtures = [
+            'aspecto_carta/fixtures/initial_data.json',
+            'tapete/fixtures/initial_data.json'
+        ]
+    for fixture in fixtures:
+            call_command('loaddata', fixture)
+
     def setUp(self):
         """
         Setting up the test environment with users and matches.

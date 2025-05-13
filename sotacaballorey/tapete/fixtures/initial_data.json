@@ -4,7 +4,7 @@
         "pk": 1,
         "fields": {
             "id": 1,
-            "name": "1",
+            "name": "Default",
             "file_path": "/static/images/tapetes/1.png"
         }
     },
@@ -13,8 +13,26 @@
         "pk": 2,
         "fields": {
             "id": 2,
-            "name": "2",
+            "name": "Rojo-negro",
             "file_path": "/static/images/tapetes/2.png"
+        }
+    },
+    {
+        "model": "tapete.tapete",
+        "pk": 3,
+        "fields": {
+            "id": 3,
+            "name": "Azul-plata",
+            "file_path": "/static/images/tapetes/3.png"
+        }   
+    },
+    {
+        "model": "tapete.tapete",
+        "pk": 4,
+        "fields": {
+            "id": 4,
+            "name": "Rojo-dorado",
+            "file_path": "/static/images/tapetes/4.png"
         }
     }
 ]

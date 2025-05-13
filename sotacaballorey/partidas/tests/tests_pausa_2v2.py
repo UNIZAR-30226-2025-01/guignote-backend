@@ -10,9 +10,17 @@ from django.urls import reverse
 import json
 from django.test import Client
 import tracemalloc
+from django.core.management import call_command
 
 class TestPauseFunctionality2v2(TransactionTestCase):
     reset_sequences = True
+
+    fixtures = [
+            'aspecto_carta/fixtures/initial_data.json',
+            'tapete/fixtures/initial_data.json'
+        ]
+    for fixture in fixtures:
+            call_command('loaddata', fixture)  
 
     def setUp(self):
         # Create four users

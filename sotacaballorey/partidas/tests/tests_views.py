@@ -2,13 +2,21 @@ from partidas.models import Partida, JugadorPartida
 from django.test import TestCase, Client
 from utils.jwt_auth import generar_token
 from usuarios.models import Usuario
+from django.core.management import call_command
 
 class SalaTests(TestCase):
+
+    fixtures = [
+            'aspecto_carta/fixtures/initial_data.json',
+            'tapete/fixtures/initial_data.json'
+        ]
+    for fixture in fixtures:
+            call_command('loaddata', fixture)
    
     def setUp(self):
         self.cliente = Client()
 
-        # Crear usuario para las pruebas y generar su token
+        # Crear usuario para l        default_tapete = Tapete.objects.get(name="Default")  # Ensure this tapete existsas pruebas y generar su token
         self.usuario = Usuario.objects.create(
             nombre='Usuario', correo='usuario@gmail.com', contrasegna='123'
         )
