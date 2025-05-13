@@ -39,6 +39,9 @@ def crear_usuarios():
             user.elo = elo
             user.save()
 
+    for user in Usuario.objects.all():
+        user.save()
+
     return usuarios
 
 # Función para crear solicitudes de amistad
