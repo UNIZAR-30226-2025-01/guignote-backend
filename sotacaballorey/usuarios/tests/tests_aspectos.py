@@ -18,6 +18,9 @@ class CardSkinBackTestCase(TestCase):
     
     def setUp(self):
 
+        self.default_skin = CardSkin.objects.get(name="Default")
+        self.default_tapete = Tapete.objects.get(name="Default")
+
         self.current_skins = CardSkin.objects.all().count()
         self.current_backs = CardBack.objects.all().count()
         self.current_tapetes = Tapete.objects.all().count()
@@ -191,9 +194,9 @@ class CardSkinBackTestCase(TestCase):
         response = self.client.get(self.get_equipped_items_url)
         self.assertEqual(response.status_code, 200)
         equipped_data = json.loads(response.content)
-        self.assertIsNone(equipped_data['equipped_skin'])
-        self.assertIsNone(equipped_data['equipped_back'])
-        self.assertIsNone(equipped_data['equipped_tapete'])
+        self.assertEqual(equipped_data['equipped_skin']['name'], self.default_skin.name)
+        self.assertEqual(equipped_data['equipped_back'], None)
+        self.assertEqual(equipped_data['equipped_tapete']['name'], self.default_tapete.name)
         
         # Equip items
         self.client.post(reverse('equip_skin', kwargs={'user_id': self.user.id}), 
