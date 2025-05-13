@@ -107,10 +107,15 @@ class PartidaConsumer(AsyncWebsocketConsumer):
         if jugador:
             jugador.channel_name = self.channel_name
             jugador.conectado = True
+
             try:
                 await db_sync_to_async_save(jugador)
             except Exception as e:
                 print(f"Error al guardar el jugador: {e}")
+
+            if str(jugador.id) in self.partida.jugadores_pausa:
+                self.partida.jugadores_pausa.remove(str(jugador.id))
+                await db_sync_to_async_save(self.partida)
 
             await send_to_group(self.channel_layer, self.room_group_name, MessageTypes.PLAYER_JOINED, data={
                 'message': f'{self.usuario.nombre} se ha unido a la partida.',
@@ -121,7 +126,8 @@ class PartidaConsumer(AsyncWebsocketConsumer):
                 'chat_id': await obtener_chat_id(self.partida),
                 'partida_id': self.partida.id,
                 'capacidad': self.capacidad,
-                'jugadores': await contar_jugadores(self.partida)
+                'jugadores': await contar_jugadores(self.partida),
+                'pausados': len(self.partida.jugadores_pausa or [])
             })      
 
         if self.partida.estado == 'jugando':
