@@ -402,6 +402,12 @@ class PartidaConsumer(AsyncWebsocketConsumer):
 
         jugador_que_juega: JugadorPartida = await get_jugador(self.partida, self.usuario)
 
+        estado_json = self.partida.estado_json
+        ya_jugo = any(jugada['jugador_id'] == jugador_que_juega.id for jugada in estado_json.get('baza_actual', []))
+        if ya_jugo:
+            await send_error(self.send, "Ya has jugado en esta baza")
+            return
+
         # ¿Es tu turno?
         if turno_actual_id != jugador_que_juega.id:
             await send_error(self.send, "No es tu turno")
