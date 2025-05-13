@@ -190,7 +190,7 @@ def obtener_elo(request, user_id):
     """
     if request.method == "GET":
         usuario = get_object_or_404(Usuario, id=user_id)
-        return JsonResponse({"user": usuario.nombre, "elo": usuario.elo}, status=200)
+        return JsonResponse({"user": usuario.nombre, "elo": usuario.elo, "elo_rank": usuario.elo_rank}, status=200)
 
     return JsonResponse({"error": "Método no permitido"}, status=405)
 
@@ -215,7 +215,7 @@ def obtener_elo_autenticado(request):
     """
     if request.method == "GET":
         usuario = request.usuario  # Usuario autenticado extraído del token
-        return JsonResponse({"user": usuario.nombre, "elo": usuario.elo}, status=200)
+        return JsonResponse({"user": usuario.nombre, "elo": usuario.elo, "elo_rank": usuario.elo_rank}, status=200)
 
     return JsonResponse({"error": "Método no permitido"}, status=405)
 
@@ -256,6 +256,7 @@ def obtener_usuario_estadisticas_autenticado(request):
             "porcentaje_derrotas": loss_percentage,
             "elo": usuario.elo,
             "elo_parejas": usuario.elo_parejas,
+            "elo_rank": usuario.elo_rank,
             "imagen": request.build_absolute_uri(usuario.imagen.url) if usuario.imagen else None
         }
 
